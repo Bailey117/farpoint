@@ -29,7 +29,7 @@ import { isSoundOn, setSoundOn } from './dialPlayer';
 import { mountDialView } from './dialView';
 import { h } from './dom';
 import { mountExpeditionView } from './expeditionView';
-import { powerMeter } from './widgets';
+import { confirmButton, powerMeter } from './widgets';
 
 type Screen =
   | { kind: 'title'; problem?: string }
@@ -182,7 +182,6 @@ export function startApp(root: HTMLElement): void {
     buy: (item: Parameters<typeof buyItem>[1]) => apply(buyItem(run!, item)),
     chargeCapacitor: () => apply(chargeCapacitor(run!)),
     abandon: () => {
-      if (!window.confirm('Abandon this run? It cannot be recovered.')) return;
       clearSave(storage);
       run = null;
       show({ kind: 'title' });
@@ -238,17 +237,9 @@ export function startApp(root: HTMLElement): void {
             'div',
             { class: 'controls new-run' },
             h('label', {}, 'Seed ', seedInput),
-            h(
-              'button',
-              {
-                class: run ? '' : 'primary',
-                onclick: () => {
-                  if (run && run.status === 'active' && !window.confirm('Start a new run? Your current run will be lost.')) return;
-                  startNew((seedInput as HTMLInputElement).value.trim() || Date.now().toString(36));
-                },
-              },
-              'New run',
-            ),
+            run && run.status === 'active'
+              ? confirmButton('New run', 'Click again: your current run will be lost', () => startNew((seedInput as HTMLInputElement).value.trim() || Date.now().toString(36)))
+              : h('button', { class: run ? '' : 'primary', onclick: () => startNew((seedInput as HTMLInputElement).value.trim() || Date.now().toString(36)) }, 'New run'),
           ),
         ),
       ),

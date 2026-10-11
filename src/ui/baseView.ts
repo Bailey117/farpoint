@@ -11,6 +11,7 @@ import { HAZARD_LABEL } from '../game/world';
 import { h } from './dom';
 import { ITEM_LABEL, memberCard } from './expeditionView';
 import { glyphSvg } from './glyphArt';
+import { confirmButton } from './widgets';
 
 export interface BaseActions {
   decode(leadId: string): void;
@@ -168,7 +169,7 @@ export function renderBase(root: HTMLElement, run: RunState, actions: BaseAction
       { class: 'run-stats muted small-text' },
       `Expeditions ${run.stats.expeditions} · Dials ${run.stats.dials} · Fragments ${run.stats.fragments} · Lost ${run.stats.deaths}`,
     ),
-    h('button', { class: 'small danger', onclick: actions.abandon }, 'Abandon run'),
+    confirmButton('Abandon run', 'Click again to abandon for good', actions.abandon, 'small danger'),
   );
 
   root.replaceChildren(
