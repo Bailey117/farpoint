@@ -164,7 +164,8 @@ export function heavyRotation(u: number, degrees: number): number {
 // Sampling
 // ---------------------------------------------------------------------------
 
-export type ChevronLight = 'dark' | 'armed' | Mark;
+/** 'energy': the ring is fully charged (successful dial). */
+export type ChevronLight = 'dark' | 'armed' | 'energy' | Mark;
 
 export interface ChevronFrame {
   light: ChevronLight;
@@ -283,7 +284,12 @@ export function sampleRing(plan: DialPlan, tMs: number): RingFrame {
       veil = u < 0.25 ? 0 : easeOutQuad(clamp01((u - 0.25) / 0.45));
       const burst = u >= 0.25 ? Math.exp(-((t - plan.finaleStart - dur * 0.25) / 260)) : 0;
       shake = Math.max(shake, burst, u < 0.25 ? 0.25 * (u / 0.25) : 0);
-      for (const c of chevrons) c.glow = Math.max(c.glow, u < 0.25 ? 0.85 + 0.15 * Math.sin(t / 40) : 1);
+      // Charge cascade: chevrons turn from locked green to energy, one by
+      // one in slot order, the last converting just before the burst.
+      chevrons.forEach((c, i) => {
+        if (t >= chargeTime(plan, i)) c.light = 'energy';
+        c.glow = Math.max(c.glow, u < 0.25 ? 0.85 + 0.15 * Math.sin(t / 40) : 1);
+      });
     } else {
       rim = 1 - 0.65 * easeOutQuad(clamp01(u));
     }
@@ -301,6 +307,12 @@ export function sampleRing(plan: DialPlan, tMs: number): RingFrame {
     veil,
     phase,
   };
+}
+
+/** When chevron `slot` converts to energy during a successful finale. */
+export function chargeTime(plan: DialPlan, slot: number): number {
+  const gather = (plan.totalMs - plan.finaleStart) * 0.25;
+  return plan.finaleStart + (gather * (slot + 1)) / (plan.slotCount + 1);
 }
 
 /** Normalized speed sampled at a fixed interval across the whole plan (for audio). */

@@ -5,8 +5,8 @@
   --line: #2a3644;
   --text: #dbe4ee;
   --muted: #8494a7;
-  --accent: #e0a64b;
-  --accent-2: #f3c57d;
+  --accent: #4da3ff;
+  --accent-2: #9fd2ff;
   --locked: #4fc38a;
   --drifting: #e0b64b;
   --absent: #5b6573;
@@ -33,7 +33,7 @@ button {
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-button.primary { background: var(--accent); color: #1b1305; border-color: var(--accent); font-weight: 600; }
+button.primary { background: var(--accent); color: #04111f; border-color: var(--accent); font-weight: 600; }
 
 h1 { font-size: 1.3rem; margin: 0; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent-2); }
 h2 { font-size: 0.85rem; margin: 16px 0 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
@@ -73,7 +73,7 @@ h2 { font-size: 0.85rem; margin: 16px 0 8px; letter-spacing: 0.12em; text-transf
   position: relative; aspect-ratio: 1; padding: 12px; display: grid; place-items: center;
   background: var(--bg); border: 2px solid var(--line); color: var(--text);
 }
-.slot.cursor { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(224, 166, 75, 0.2); }
+.slot.cursor { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.25); }
 .slot.known { color: var(--locked); }
 .slot.warn { border-style: dashed; border-color: var(--danger); }
 .slot-num { position: absolute; top: 3px; left: 6px; font-size: 0.7rem; color: var(--muted); }

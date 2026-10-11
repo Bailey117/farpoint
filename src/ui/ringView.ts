@@ -14,10 +14,14 @@ const NS = 'http://www.w3.org/2000/svg';
 const LIGHT_COLOR: Record<ChevronLight, string> = {
   dark: '#1b222b',
   armed: '#c9d3dd',
+  energy: '#4da3ff',
   locked: '#4fc38a',
   drifting: '#e0b64b',
   absent: '#6b7584',
 };
+
+/** The ring's energy colour: rim lights, keystone and the veil. */
+const ENERGY = '#4da3ff';
 
 const KEY_COLOR: Record<Mark, string> = { locked: '#4fc38a', drifting: '#e0b64b', absent: '#6b7584' };
 
@@ -94,8 +98,8 @@ export class RingView {
         <stop offset="0" stop-color="#05070a"/><stop offset="0.85" stop-color="#0b1016"/><stop offset="1" stop-color="#151b22"/>
       </radialGradient>
       <radialGradient id="${this.ids.veil}" cx="0" cy="0" r="108" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stop-color="#fffaf0"/><stop offset="0.35" stop-color="#ffe2a8"/>
-        <stop offset="0.7" stop-color="#e0a64b"/><stop offset="0.92" stop-color="#8a4f1e"/><stop offset="1" stop-color="#3a2410"/>
+        <stop offset="0" stop-color="#f2fbff"/><stop offset="0.3" stop-color="#a8dcff"/>
+        <stop offset="0.62" stop-color="#3d8eff"/><stop offset="0.88" stop-color="#1b3c9c"/><stop offset="1" stop-color="#0a1440"/>
       </radialGradient>
       <filter id="${this.ids.glow}" x="-50%" y="-50%" width="200%" height="200%">
         <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
@@ -120,8 +124,8 @@ export class RingView {
     for (let i = 0; i < 48; i++) {
       el('line', { x1: 0, y1: -188, x2: 0, y2: -195, transform: `rotate(${i * 7.5})` }, notches);
     }
-    this.rimOuter = el('circle', { r: 192, fill: 'none', stroke: '#e0a64b', 'stroke-width': 2, opacity: 0, filter: `url(#${this.ids.glow})` }, this.svg);
-    this.rimInner = el('circle', { r: 153, fill: 'none', stroke: '#e0a64b', 'stroke-width': 1.5, opacity: 0, filter: `url(#${this.ids.glow})` }, this.svg);
+    this.rimOuter = el('circle', { r: 192, fill: 'none', stroke: ENERGY, 'stroke-width': 2, opacity: 0, filter: `url(#${this.ids.glow})` }, this.svg);
+    this.rimInner = el('circle', { r: 153, fill: 'none', stroke: ENERGY, 'stroke-width': 1.5, opacity: 0, filter: `url(#${this.ids.glow})` }, this.svg);
 
     // Rotating glyph band.
     this.rotor = el('g', {}, this.svg);
@@ -145,7 +149,7 @@ export class RingView {
     const cs = Math.cos(Math.PI / 24);
     this.targetGlow = el('path', {
       d: `M${-149 * sn} ${-149 * cs} A149 149 0 0 1 ${149 * sn} ${-149 * cs} L${108 * sn} ${-108 * cs} A108 108 0 0 0 ${-108 * sn} ${-108 * cs} Z`,
-      fill: '#e0a64b',
+      fill: ENERGY,
       opacity: 0,
       filter: `url(#${this.ids.glow})`,
     }, this.svg);
@@ -157,8 +161,8 @@ export class RingView {
     this.veilGroup = el('g', { opacity: 0, 'clip-path': `url(#${this.ids.veilClip})` }, this.svg);
     this.veilClip = defs.querySelector('clipPath circle') as SVGCircleElement;
     this.veilDisc = el('circle', { r: 135, fill: `url(#${this.ids.veil})`, filter: `url(#${this.ids.veilFx})` }, this.veilGroup);
-    this.veilRings = [0, 1, 2].map(() => el('circle', { r: 10, fill: 'none', stroke: '#fff2d0', 'stroke-width': 2, opacity: 0 }, this.veilGroup));
-    this.flash = el('circle', { r: 108, fill: '#fff6e0', opacity: 0 }, this.svg);
+    this.veilRings = [0, 1, 2].map(() => el('circle', { r: 10, fill: 'none', stroke: '#d9f0ff', 'stroke-width': 2, opacity: 0 }, this.veilGroup));
+    this.flash = el('circle', { r: 108, fill: '#eef8ff', opacity: 0 }, this.svg);
 
     // Chevrons and keystone.
     this.chevronLayer = el('g', {}, this.svg);
@@ -191,10 +195,10 @@ export class RingView {
 
     // Keystone travel and colour.
     this.keystone.setAttribute('transform', `translate(0 ${(f.keystone * 14).toFixed(2)})`);
-    const keyColor = f.keystoneMark ? KEY_COLOR[f.keystoneMark] : f.rim > 0.05 ? '#e0a64b' : LIGHT_COLOR.dark;
+    const keyColor = f.keystoneMark ? KEY_COLOR[f.keystoneMark] : f.rim > 0.05 ? ENERGY : LIGHT_COLOR.dark;
     this.keystoneLight.setAttribute('fill', keyColor);
     this.keystoneLight.setAttribute('opacity', (0.35 + 0.65 * Math.max(f.rim, f.keystone)).toFixed(3));
-    this.targetGlow.setAttribute('fill', f.keystoneMark ? KEY_COLOR[f.keystoneMark] : '#e0a64b');
+    this.targetGlow.setAttribute('fill', f.keystoneMark ? KEY_COLOR[f.keystoneMark] : ENERGY);
     this.targetGlow.setAttribute('opacity', (f.keystoneMark ? 0.45 * f.keystone : f.phase === 'dialing' ? 0.12 : 0).toFixed(3));
 
     f.chevrons.forEach((c, i) => {

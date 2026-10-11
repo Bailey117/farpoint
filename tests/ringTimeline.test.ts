@@ -7,6 +7,7 @@ import {
   REDUCED_TIMING,
   angleForGlyph,
   buildDialPlan,
+  chargeTime,
   heavyRotation,
   sampleRing,
   shortestDelta,
@@ -132,6 +133,28 @@ describe('sampleRing', () => {
       expect(after.keystone).toBe(1);
       expect(after.keystoneMark).toBe(step.mark);
       expect(after.shake).toBeGreaterThan(0);
+    }
+  });
+
+  it('converts every chevron to energy, in slot order, before the burst on success', () => {
+    const plan = buildDialPlan(GUESS, WIN, 0);
+    const times = GUESS.map((_, i) => chargeTime(plan, i));
+    for (let i = 1; i < times.length; i++) expect(times[i]).toBeGreaterThan(times[i - 1]!);
+    expect(times[0]).toBeGreaterThan(plan.finaleStart);
+    // All converted before the veil starts opening.
+    const burst = plan.finaleStart + (plan.totalMs - plan.finaleStart) * 0.25;
+    expect(times[times.length - 1]).toBeLessThan(burst);
+    times.forEach((ct, i) => {
+      expect(sampleRing(plan, ct - 1).chevrons[i]!.light).toBe('locked');
+      expect(sampleRing(plan, ct).chevrons[i]!.light).toBe('energy');
+    });
+    expect(sampleRing(plan, plan.totalMs).chevrons.every((c) => c.light === 'energy')).toBe(true);
+  });
+
+  it('never shows energy chevrons on a failed dial', () => {
+    const plan = buildDialPlan(GUESS, FAIL, 0);
+    for (let t = 0; t <= plan.totalMs; t += 25) {
+      expect(sampleRing(plan, t).chevrons.some((c) => c.light === 'energy')).toBe(false);
     }
   });
 
