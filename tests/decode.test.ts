@@ -8,9 +8,11 @@ import {
   createDecode,
   deriveKnowledge,
   dial,
+  slotCandidates,
   useAid,
 } from '../src/game/decode';
 import { GLYPH_IDS, type GlyphId } from '../src/game/glyphs';
+import { Rng } from '../src/game/rng';
 
 function ok<T extends { ok: boolean }>(r: T): Extract<T, { ok: true }> {
   if (!r.ok) throw new Error(`expected ok, got ${JSON.stringify(r)}`);
@@ -176,5 +178,51 @@ describe('deriveKnowledge', () => {
     expect(k.slotExcluded[1]?.has(a[2]!)).toBe(true);
     for (const g of outside.slice(0, 4)) expect(k.glyphStatus[g]).toBe('absent');
     expect(k.glyphStatus[a[3]!]).toBe('unknown');
+  });
+});
+
+describe('slotCandidates', () => {
+  it('always contains the true glyph and shrinks as evidence comes in', () => {
+    for (let i = 0; i < 60; i++) {
+      let s = createDecode(`cand-${i}`, cfg({ power: 1000 }));
+      const rng = new Rng(i);
+      let prevTotal = Infinity;
+      for (let d = 0; d < 6 && s.status === 'active'; d++) {
+        const k = deriveKnowledge(s);
+        let total = 0;
+        s.address.forEach((g, slot) => {
+          const c = slotCandidates(k, slot);
+          expect(c).toContain(g);
+          total += c.length;
+        });
+        expect(total).toBeLessThanOrEqual(prevTotal);
+        prevTotal = total;
+        s = ok(dial(s, rng.sample(GLYPH_IDS, 6))).state;
+      }
+    }
+  });
+
+  it('a solved slot has exactly its glyph; absent and placed glyphs are excluded', () => {
+    const s0 = createDecode('cand-x', cfg({ fragments: { knownSlots: 0, clues: 0 } }));
+    const a = s0.address;
+    const outside = GLYPH_IDS.filter((g) => !a.includes(g));
+    const s1 = ok(dial(s0, [a[0]!, a[2]!, ...outside.slice(0, 4)])).state;
+    const k = deriveKnowledge(s1);
+    expect(slotCandidates(k, 0)).toEqual([a[0]]);
+    for (const slot of [1, 2, 3, 4, 5]) {
+      const c = slotCandidates(k, slot);
+      expect(c).not.toContain(a[0]); // placed in slot 0
+      for (const g of outside.slice(0, 4)) expect(c).not.toContain(g); // absent
+    }
+    expect(slotCandidates(k, 1)).not.toContain(a[2]); // drifting at slot 1, so not there
+  });
+
+  it('once every glyph is identified, only identified glyphs remain candidates', () => {
+    const s0 = createDecode('cand-all', cfg({ fragments: { knownSlots: 0, clues: 0 } }));
+    const rotated = [...s0.address.slice(1), s0.address[0]!];
+    const k = deriveKnowledge(ok(dial(s0, rotated)).state);
+    for (let slot = 0; slot < 6; slot++) {
+      for (const g of slotCandidates(k, slot)) expect(s0.address).toContain(g);
+    }
   });
 });

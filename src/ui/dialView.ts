@@ -42,6 +42,7 @@ export function mountDialView(root: HTMLElement, title: string, address: readonl
         if (!el) return;
         el.classList.toggle('active', frame.activeSlot === i && (c.light === 'armed' || c.light === 'dark'));
         if ((c.light === 'locked' || c.light === 'energy') && !el.classList.contains('revealed')) el.classList.add('revealed', 'mark-locked', 'hit');
+        if (c.light === 'energy' && !el.classList.contains('energized')) el.classList.add('energized');
       });
     })
     .then(() => {

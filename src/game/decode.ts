@@ -235,3 +235,26 @@ export function deriveKnowledge(state: Pick<DecodeState, 'address' | 'facts' | '
 export function solvedAddress(state: DecodeState): Address | null {
   return state.status === 'solved' ? state.address : null;
 }
+
+/**
+ * Glyphs that could still sit in `slot`, judging only by direct evidence:
+ * not known absent, not ruled out of this slot, not known to sit in another
+ * slot, and, once every glyph of the address has been identified, one of
+ * those glyphs. A solved slot has exactly its glyph. The true glyph is
+ * always included.
+ */
+export function slotCandidates(k: Knowledge, slot: number): GlyphId[] {
+  const known = k.slotGlyph[slot];
+  if (known) return [known];
+  const length = k.slotGlyph.length;
+  const placed = new Set(k.slotGlyph.filter((g): g is GlyphId => g !== null));
+  const identified = GLYPH_IDS.filter((g) => k.glyphStatus[g] === 'present' || k.glyphStatus[g] === 'locked');
+  const allIdentified = identified.length >= length;
+  return GLYPH_IDS.filter(
+    (g) =>
+      k.glyphStatus[g] !== 'absent' &&
+      !placed.has(g) &&
+      !k.slotExcluded[slot]!.has(g) &&
+      (!allIdentified || k.glyphStatus[g] === 'present'),
+  );
+}

@@ -27,8 +27,9 @@ export interface ExpeditionConfig {
 }
 
 export const DEFAULT_EXPEDITION_CONFIG: ExpeditionConfig = {
-  returnCost: 10,
-  emergencyCost: 25,
+  /** Dialling home after the last encounter is free, as rings are meant to work. */
+  returnCost: 0,
+  emergencyCost: 15,
   roleBonus: 0.15,
 };
 

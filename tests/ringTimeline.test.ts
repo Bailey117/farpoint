@@ -7,6 +7,9 @@ import {
   REDUCED_TIMING,
   angleForGlyph,
   buildDialPlan,
+  BREATH_MS,
+  SHOCK_MS,
+  burstTime,
   chargeTime,
   revealedMarks,
   heavyRotation,
@@ -170,6 +173,26 @@ describe('sampleRing', () => {
       for (let t = plan.finaleStart; t <= plan.totalMs; t += 50) {
         expect(revealedMarks(sampleRing(plan, t))).toEqual(marks);
       }
+    }
+  });
+
+  it('success has a held breath, then a flash and a shockwave at the burst', () => {
+    const win = buildDialPlan(GUESS, WIN, 0);
+    const b = burstTime(win);
+    const still = sampleRing(win, b - BREATH_MS / 2);
+    expect(still.shake).toBe(0);
+    expect(still.flash).toBe(0);
+    const hit = sampleRing(win, b);
+    expect(hit.flash).toBeCloseTo(1);
+    expect(hit.shake).toBeGreaterThan(1);
+    expect(sampleRing(win, b + SHOCK_MS / 2).shock).toBeCloseTo(0.5);
+    expect(sampleRing(win, b + SHOCK_MS + 10).shock).toBe(0);
+    // Failed dials get none of it.
+    const fail = buildDialPlan(GUESS, FAIL, 0);
+    for (let t = 0; t <= fail.totalMs; t += 25) {
+      const f = sampleRing(fail, t);
+      expect(f.flash).toBe(0);
+      expect(f.shock).toBe(0);
     }
   });
 

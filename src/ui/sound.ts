@@ -17,7 +17,7 @@
 
 import type { Mark } from '../game/address';
 import { Rng } from '../game/rng';
-import { type DialPlan, GLYPH_STEP_DEG, chargeTime, sampleRing } from './ringTimeline';
+import { BREATH_MS, type DialPlan, GLYPH_STEP_DEG, chargeTime, sampleRing } from './ringTimeline';
 
 const MIN = 0.0001;
 
@@ -58,6 +58,8 @@ interface ChoirVoice {
 export class RingSound {
   readonly ctx: BaseAudioContext;
   private readonly master: GainNode;
+  /** Whole-mix gate, dipped for the held breath before a burst (reverb included). */
+  private readonly gate: GainNode;
   private readonly bus: GainNode;
   /** Saturated bus for sub-bass hits, so they read on small speakers. */
   private readonly heavy: GainNode;
@@ -91,7 +93,8 @@ export class RingSound {
 
     this.master = ctx.createGain();
     this.master.gain.value = 0.85;
-    comp.connect(this.master).connect(limiter).connect(destination);
+    this.gate = ctx.createGain();
+    comp.connect(this.gate).connect(this.master).connect(limiter).connect(destination);
 
     this.bus = ctx.createGain();
     this.bus.connect(comp);
@@ -155,6 +158,9 @@ export class RingSound {
     const voice: Voice = {
       stop: (fadeSec = 0.12) => {
         const now = this.ctx.currentTime;
+        // Cancel any pending breath dip so it cannot fire after a skip.
+        this.gate.gain.cancelScheduledValues(now);
+        this.gate.gain.setValueAtTime(1, now);
         for (const g of [out, heavy]) {
           g.gain.cancelScheduledValues(now);
           g.gain.setValueAtTime(g.gain.value, now);
@@ -458,6 +464,13 @@ export class RingSound {
     const start = T(plan.finaleStart);
     const dur = end - start;
     const burst = start + dur * 0.25;
+    // A held breath just before the burst: everything cuts out, then the boom.
+    const hold = burst - BREATH_MS / 1000;
+    const cut = hold + 0.03;
+    this.gate.gain.setValueAtTime(1, hold);
+    this.gate.gain.linearRampToValueAtTime(0.04, cut);
+    this.gate.gain.setValueAtTime(0.04, burst - 0.002);
+    this.gate.gain.linearRampToValueAtTime(1, burst);
 
     // Charge cascade: a rising chime as each chevron turns blue.
     for (let i = 0; i < plan.slotCount; i++) {
@@ -475,35 +488,41 @@ export class RingSound {
     {
       const g = this.gain(out, 0);
       g.gain.setValueAtTime(MIN, start);
-      g.gain.exponentialRampToValueAtTime(0.4, burst);
-      g.gain.exponentialRampToValueAtTime(MIN, burst + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.4, hold);
+      g.gain.exponentialRampToValueAtTime(MIN, cut);
       const lp = this.filter(g, 'lowpass', 200, 1.5);
       lp.frequency.setValueAtTime(200, start);
-      lp.frequency.exponentialRampToValueAtTime(7000, burst);
-      this.noiseSrc(lp, src, start, burst + 0.1);
+      lp.frequency.exponentialRampToValueAtTime(7000, hold);
+      this.noiseSrc(lp, src, start, burst);
     }
     {
       const g = this.gain(heavy, 0);
       g.gain.setValueAtTime(MIN, start);
-      g.gain.exponentialRampToValueAtTime(0.45, burst);
-      g.gain.exponentialRampToValueAtTime(MIN, burst + 0.08);
-      const o = this.osc(g, src, 'sine', 28, start, burst + 0.1);
-      o.frequency.exponentialRampToValueAtTime(65, burst);
+      g.gain.exponentialRampToValueAtTime(0.45, hold);
+      g.gain.exponentialRampToValueAtTime(MIN, cut);
+      const o = this.osc(g, src, 'sine', 28, start, burst);
+      o.frequency.exponentialRampToValueAtTime(65, hold);
       const lp = this.filter(this.gain(g, 0.5), 'lowpass', 900);
       for (const f of [D2, A2]) {
-        const s = this.osc(lp, src, 'sawtooth', f, start, burst + 0.1);
-        s.frequency.exponentialRampToValueAtTime(f * 2, burst);
+        const s = this.osc(lp, src, 'sawtooth', f, start, burst);
+        s.frequency.exponentialRampToValueAtTime(f * 2, hold);
       }
     }
     for (const v of lockVoices) {
       v.level.gain.setValueAtTime(0.055, start);
-      v.level.gain.linearRampToValueAtTime(0.11, burst);
+      v.level.gain.linearRampToValueAtTime(0.11, hold);
+      v.level.gain.linearRampToValueAtTime(0, cut);
+      v.level.gain.setValueAtTime(0, burst);
+      v.level.gain.linearRampToValueAtTime(0.1, burst + 0.04);
       v.level.gain.linearRampToValueAtTime(0.05, burst + 0.8);
       v.level.gain.setValueAtTime(0.05, end);
       v.level.gain.linearRampToValueAtTime(0, end + 4);
     }
     drone.gain.setValueAtTime(0.16, start);
-    drone.gain.linearRampToValueAtTime(0.3, burst);
+    drone.gain.linearRampToValueAtTime(0.3, hold);
+    drone.gain.linearRampToValueAtTime(0, cut);
+    drone.gain.setValueAtTime(0, burst);
+    drone.gain.linearRampToValueAtTime(0.32, burst + 0.03);
     drone.gain.linearRampToValueAtTime(0.14, burst + 1);
     drone.gain.setValueAtTime(0.14, end);
     drone.gain.linearRampToValueAtTime(0, end + 4);
@@ -526,6 +545,8 @@ export class RingSound {
       }
     }
     this.drop(heavy, src, burst, 1.0, 75, 22, 3.2);
+    // A second, deeper body blow a beat later: the ground answering.
+    this.drop(heavy, src, burst + 0.09, 0.7, 48, 18, 2.6);
     this.burst(out, src, burst, 0.45, 'highpass', 2400, 0.05);
     this.burst(out, src, burst, 0.55, 'lowpass', 1600, 1.8, 0.5, 0.01);
     this.gong(out, src, burst + 0.02, 41.2, 0.3, 5);

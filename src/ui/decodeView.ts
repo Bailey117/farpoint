@@ -14,6 +14,7 @@ import {
   canDial,
   deriveKnowledge,
   dial,
+  slotCandidates,
   useAid,
 } from '../game/decode';
 import { GLYPH_IDS, type GlyphId, glyphName } from '../game/glyphs';
@@ -148,6 +149,8 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
           el.title = `Slot ${i + 1}: ${glyphName(last.guess[i]!)} — ${MARK_LABEL[m]}`;
           el.append(h('span', { class: 'slot-pip' }, markDot(m)));
         }
+        // On a successful dial the row charges blue with the chevrons.
+        if (frame.chevrons[i]?.light === 'energy' && !el.classList.contains('energized')) el.classList.add('energized');
       });
     });
     dialing = false;
@@ -201,7 +204,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
             const m = result!.marks[i] as Mark;
             return h(
               'button',
-              { class: `slot revealed mark-${m}`, title: `Slot ${i + 1}: ${glyphName(g)} — ${MARK_LABEL[m]}`, onclick: () => clearSlot(i) },
+              { class: `slot revealed mark-${m} ${shown.status === 'solved' ? 'energized' : ''}`, title: `Slot ${i + 1}: ${glyphName(g)} — ${MARK_LABEL[m]}`, onclick: () => clearSlot(i) },
               h('span', { class: 'slot-num' }, String(i + 1)),
               glyphSvg(g),
               h('span', { class: 'slot-pip' }, markDot(m)),
@@ -254,6 +257,37 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
       h('button', { disabled: dialing, onclick: () => { result = null; resetDraft(); render(); } }, 'Reset'),
     );
 
+    // Candidate helper: which glyphs could still go in the highlighted slot.
+    const slotN = cursor + 1;
+    const candidates = new Set(slotCandidates(k, cursor));
+    const solvedHere = k.slotGlyph[cursor];
+    const openSlots = k.slotGlyph.map((g, i) => (g === null ? i : -1)).filter((i) => i >= 0);
+    const lastSlot = openSlots.length === 1 ? openSlots[0]! : null;
+    const lastCandidates = lastSlot === null ? [] : slotCandidates(k, lastSlot);
+    const candidateNames = [...candidates].map(glyphName);
+    const helper =
+      shown.status === 'solved' || result
+        ? null
+        : h(
+            'p',
+            { class: 'candidates', role: 'status' },
+            solvedHere
+              ? [h('strong', {}, `Slot ${slotN} is solved: `), glyphName(solvedHere), '.']
+              : [
+                  h('strong', {}, `Slot ${slotN}: ${candidates.size} glyph${candidates.size === 1 ? '' : 's'} could go here`),
+                  candidates.size <= 8 ? ` (${candidateNames.join(', ')}).` : '. The others are dimmed.',
+                ],
+          );
+    const endgame =
+      lastSlot !== null && lastCandidates.length > 1 && shown.status !== 'solved' && !result
+        ? h(
+            'div',
+            { class: 'endgame-tip' },
+            h('strong', {}, `Only slot ${lastSlot + 1} is left, with ${lastCandidates.length} candidates.`),
+            ' Put some of them in your solved slots as well: one dial then tests several at once, and you lose nothing because you already know what goes there.',
+          )
+        : null;
+
     const palette = h(
       'div',
       { class: 'palette', role: 'group', 'aria-label': 'Glyphs' },
@@ -261,8 +295,8 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
         h(
           'button',
           {
-            class: `glyph-btn status-${k.glyphStatus[g]} ${draft.includes(g) ? 'in-draft' : ''}`,
-            title: `${glyphName(g)} — ${statusText(k.glyphStatus[g])}`,
+            class: `glyph-btn status-${k.glyphStatus[g]} ${draft.includes(g) ? 'in-draft' : ''} ${!candidates.has(g) && k.glyphStatus[g] !== 'absent' ? 'not-here' : ''}`,
+            title: `${glyphName(g)} — ${statusText(k.glyphStatus[g])}${!candidates.has(g) && k.glyphStatus[g] !== 'absent' ? `; cannot go in slot ${slotN}` : ''}`,
             disabled: dialing,
             onclick: () => placeGlyph(g),
           },
@@ -378,6 +412,8 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
             h('h2', {}, 'Glyphs'),
             h('p', { class: 'muted' }, 'Pick glyphs to fill the highlighted slot. Click a slot to clear it.'),
             h('p', { class: 'muted tip' }, 'Tip: a slot you have already solved can hold an untested glyph instead. You learn more from each dial.'),
+            endgame,
+            helper,
             palette,
             h('h2', {}, 'Puzzle aids'),
             aids,

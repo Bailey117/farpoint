@@ -290,8 +290,17 @@ describe('ending an expedition', () => {
     expect(r.state.power).toBe(38 - DEFAULT_EXPEDITION_CONFIG.returnCost);
   });
 
-  it('strands the team when the return trip cannot be paid', () => {
-    const s = finished(20); // 8 left < 10
+  it('dialling home is free by default, even with no power left', () => {
+    expect(DEFAULT_EXPEDITION_CONFIG.returnCost).toBe(0);
+    const s = { ...finished(12), power: 0 };
+    expect(canAffordReturn(s)).toBe(true);
+    const r = ok(returnHome(s));
+    expect(r.state.status).toBe('returned');
+    expect(r.state.power).toBe(0);
+  });
+
+  it('strands the team when a costed return trip cannot be paid', () => {
+    const s = { ...finished(20), config: { ...DEFAULT_EXPEDITION_CONFIG, returnCost: 10 } }; // 8 left < 10
     expect(canAffordReturn(s)).toBe(false);
     const r = ok(returnHome(s));
     expect(r.value.stranded).toBe(true);
@@ -307,7 +316,7 @@ describe('ending an expedition', () => {
     const r = ok(emergencyDialOut(start(30)));
     expect(r.state.status).toBe('evacuated');
     expect(r.state.power).toBe(30 - DEFAULT_EXPEDITION_CONFIG.emergencyCost);
-    expect(emergencyDialOut(start(24))).toMatchObject({ ok: false, error: { kind: 'no-power' } });
+    expect(emergencyDialOut(start(DEFAULT_EXPEDITION_CONFIG.emergencyCost - 1))).toMatchObject({ ok: false, error: { kind: 'no-power' } });
     expect(emergencyDialOut(r.state)).toMatchObject({ ok: false, error: { kind: 'ended' } });
   });
 

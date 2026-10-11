@@ -260,7 +260,7 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
         { class: 'panel encounter' },
         h('h2', {}, 'Expedition complete'),
         h('p', {}, affordable ? 'The ring is close. Dial home?' : `You have ${s.power} power; dialling home needs ${s.config.returnCost}. If you dial without it, the team will be stranded.`),
-        h('div', { class: 'controls' }, h('button', { class: affordable ? 'primary' : 'danger', onclick: () => act(() => { const r = returnHome(s); if (r.ok) { lastResolution = null; update(r.state); } }) }, `Dial home (${s.config.returnCost} power)`)),
+        h('div', { class: 'controls' }, h('button', { class: affordable ? 'primary' : 'danger', onclick: () => act(() => { const r = returnHome(s); if (r.ok) { lastResolution = null; update(r.state); } }) }, s.config.returnCost > 0 ? `Dial home (${s.config.returnCost} power)` : 'Dial home')),
       );
     }
     const headline: Record<string, string> = {

@@ -51,7 +51,7 @@ export const RUN_CONFIG = {
   dialCost: 8,
   probeCost: 5,
   /** Base reactor output added every time a team comes home (or is lost). */
-  returnTrickle: 25,
+  returnTrickle: 9,
   /** Generator: this much salvage buys this much power. */
   generator: { salvage: 10, power: 15 },
   /** Infirmary: salvage per wound step healed. */

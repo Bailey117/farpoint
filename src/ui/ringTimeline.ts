@@ -190,6 +190,10 @@ export interface RingFrame {
   shake: number;
   /** Veil (portal) opening 0..1; only rises on success. */
   veil: number;
+  /** Full-ring white flash at the moment of the burst, 0..1. */
+  flash: number;
+  /** Shockwave after the burst: 0..1 progress outward, or 0 when none. */
+  shock: number;
   phase: 'powerup' | 'dialing' | 'finale' | 'done';
 }
 
@@ -265,6 +269,8 @@ export function sampleRing(plan: DialPlan, tMs: number): RingFrame {
   let phase: RingFrame['phase'];
   let rim: number;
   let veil = 0;
+  let flash = 0;
+  let shock = 0;
   const firstStart = plan.steps[0]?.rotateStart ?? plan.finaleStart;
   if (t < firstStart) {
     phase = 'powerup';
@@ -280,10 +286,20 @@ export function sampleRing(plan: DialPlan, tMs: number): RingFrame {
     phase = t >= plan.totalMs ? 'done' : 'finale';
     if (plan.success) {
       rim = 1;
-      // Gather, then burst open and settle.
+      // Gather, a held breath, then burst open and settle.
+      const burstAt = burstTime(plan);
+      const since = t - burstAt;
       veil = u < 0.25 ? 0 : easeOutQuad(clamp01((u - 0.25) / 0.45));
-      const burst = u >= 0.25 ? Math.exp(-((t - plan.finaleStart - dur * 0.25) / 260)) : 0;
-      shake = Math.max(shake, burst, u < 0.25 ? 0.25 * (u / 0.25) : 0);
+      const burst = since >= 0 ? Math.exp(-since / 300) : 0;
+      if (since < 0 && since > -BREATH_MS) {
+        // The breath: everything goes still and the lights sink.
+        shake = 0;
+        rim = 0.45;
+      } else {
+        shake = Math.max(shake, 1.6 * burst, u < 0.25 ? 0.25 * (u / 0.25) : 0);
+      }
+      flash = since >= 0 ? Math.exp(-since / 140) : 0;
+      shock = since >= 0 && since <= SHOCK_MS ? since / SHOCK_MS : 0;
       // Charge cascade: chevrons turn from locked green to energy, one by
       // one in slot order, the last converting just before the burst.
       chevrons.forEach((c, i) => {
@@ -305,8 +321,20 @@ export function sampleRing(plan: DialPlan, tMs: number): RingFrame {
     rim,
     shake,
     veil,
+    flash,
+    shock,
     phase,
   };
+}
+
+/** Held stillness before the burst (ms). */
+export const BREATH_MS = 140;
+/** How long the shockwave takes to sweep out (ms). */
+export const SHOCK_MS = 750;
+
+/** Moment the veil bursts open on a successful dial. */
+export function burstTime(plan: DialPlan): number {
+  return plan.finaleStart + (plan.totalMs - plan.finaleStart) * 0.25;
 }
 
 /**

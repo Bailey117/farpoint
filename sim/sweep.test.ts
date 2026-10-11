@@ -1,9 +1,10 @@
 /** Parameter sweep (sim only): mutates RUN_CONFIG per variant and restores it. */
 import { it } from 'vitest';
+import { ENCOUNTERS } from '../src/data/encounters';
 import { RUN_CONFIG } from '../src/game/run';
 import { playRun, summarise } from './bots';
 
-type Patch = Partial<{ dialCost: number; startPower: number; returnTrickle: number; genPower: number; healCost: number; recruitChance: number; finalChance: number; finalUnlock: number; returnCost: number; emergencyCost: number }>;
+type Patch = Partial<{ payMult: number; dialCost: number; startPower: number; returnTrickle: number; genPower: number; healCost: number; recruitChance: number; finalChance: number; finalUnlock: number; returnCost: number; emergencyCost: number }>;
 
 function apply(p: Patch) {
   const saved = JSON.parse(JSON.stringify(RUN_CONFIG));
@@ -18,7 +19,12 @@ function apply(p: Patch) {
   if (p.returnCost !== undefined || p.emergencyCost !== undefined) {
     RUN_CONFIG.expedition = { ...RUN_CONFIG.expedition, returnCost: p.returnCost ?? RUN_CONFIG.expedition.returnCost, emergencyCost: p.emergencyCost ?? RUN_CONFIG.expedition.emergencyCost };
   }
-  return () => Object.assign(RUN_CONFIG, saved);
+  const costs = ENCOUNTERS.flatMap((e) => e.choices.map((c) => [c, c.powerCost] as const));
+  if (p.payMult !== undefined) for (const [c, cost] of costs) if (cost) (c as { powerCost?: number }).powerCost = Math.round(cost * p.payMult);
+  return () => {
+    Object.assign(RUN_CONFIG, saved);
+    for (const [c, cost] of costs) (c as { powerCost?: number }).powerCost = cost;
+  };
 }
 
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};

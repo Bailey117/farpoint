@@ -63,6 +63,8 @@ export class RingView {
   private readonly veilClip: SVGCircleElement;
   private readonly veilRings: SVGCircleElement[];
   private readonly flash: SVGCircleElement;
+  private readonly burstFlash: SVGCircleElement;
+  private readonly shockRings: SVGCircleElement[];
   private readonly turbulence: SVGFETurbulenceElement;
   private readonly chevronLayer: SVGGElement;
   private chevrons: { light: SVGPathElement; glyphHolder: SVGGElement; glyph: GlyphId | null }[] = [];
@@ -170,6 +172,11 @@ export class RingView {
     el('path', { d: 'M-26 -209 L26 -209 L18 -170 L0 -154 L-18 -170 Z', fill: '#2f363f', stroke: '#0b0e12', 'stroke-width': 2 }, this.keystone);
     this.keystoneLight = el('path', { d: 'M-14 -200 L14 -200 L9 -175 L0 -166 L-9 -175 Z', fill: LIGHT_COLOR.dark, filter: `url(#${this.ids.glow})` }, this.keystone);
 
+    // Burst effects sit above everything: a whole-ring flash and a shockwave
+    // that sweeps out past the frame.
+    this.burstFlash = el('circle', { r: 206, fill: '#f2f9ff', opacity: 0, 'pointer-events': 'none' }, this.svg);
+    this.shockRings = [0, 1].map(() => el('circle', { r: 110, fill: 'none', stroke: '#cfe9ff', 'stroke-width': 10, opacity: 0, 'pointer-events': 'none' }, this.svg));
+
     this.setSlotCount(slotCount);
     this.render(idleFrame(slotCount, 0), 0);
   }
@@ -231,6 +238,17 @@ export class RingView {
     this.flash.setAttribute('opacity', (v > 0 ? Math.max(0, 1 - v * 2.2) : 0).toFixed(3));
 
     // Camera shake: deterministic wobble scaled by impact strength.
+    // Burst flash and shockwave (the flash is softened with reduced motion).
+    this.burstFlash.setAttribute('opacity', (f.flash * (this.reducedMotion ? 0.35 : 0.85)).toFixed(3));
+    this.shockRings.forEach((ring, i) => {
+      const p = this.reducedMotion ? 0 : Math.max(0, f.shock - i * 0.18) / (1 - i * 0.18);
+      const live = f.shock > 0 && p > 0 && p < 1;
+      const e = 1 - Math.pow(1 - p, 3);
+      ring.setAttribute('r', (110 + 250 * e).toFixed(1));
+      ring.setAttribute('stroke-width', (12 * (1 - p) + 1).toFixed(2));
+      ring.setAttribute('opacity', live ? ((1 - p) * (i === 0 ? 0.9 : 0.5)).toFixed(3) : '0');
+    });
+
     const s = this.reducedMotion ? 0 : f.shake;
     const x = s * 5 * Math.sin(timeMs * 0.093);
     const y = s * 4 * Math.cos(timeMs * 0.117);
@@ -250,6 +268,8 @@ export function idleFrame(slotCount: number, angle: number): RingFrame {
     rim: 0,
     shake: 0,
     veil: 0,
+    flash: 0,
+    shock: 0,
     phase: 'done',
   };
 }
