@@ -8,6 +8,7 @@ import {
   angleForGlyph,
   buildDialPlan,
   chargeTime,
+  revealedMarks,
   heavyRotation,
   sampleRing,
   shortestDelta,
@@ -155,6 +156,20 @@ describe('sampleRing', () => {
     const plan = buildDialPlan(GUESS, FAIL, 0);
     for (let t = 0; t <= plan.totalMs; t += 25) {
       expect(sampleRing(plan, t).chevrons.some((c) => c.light === 'energy')).toBe(false);
+    }
+  });
+
+  it('revealedMarks reports each slot exactly from its impact onwards', () => {
+    for (const marks of [FAIL, WIN]) {
+      const plan = buildDialPlan(GUESS, marks, 0);
+      for (const step of plan.steps) {
+        expect(revealedMarks(sampleRing(plan, step.impactAt - 1))[step.slot]).toBeNull();
+        expect(revealedMarks(sampleRing(plan, step.impactAt))[step.slot]).toBe(step.mark);
+      }
+      // Holds through the finale, including the energy cascade on success.
+      for (let t = plan.finaleStart; t <= plan.totalMs; t += 50) {
+        expect(revealedMarks(sampleRing(plan, t))).toEqual(marks);
+      }
     }
   });
 

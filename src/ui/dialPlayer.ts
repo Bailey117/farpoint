@@ -5,7 +5,7 @@
 import type { Mark } from '../game/address';
 import type { GlyphId } from '../game/glyphs';
 import { idleFrame, type RingView } from './ringView';
-import { DEFAULT_TIMING, type DialPlan, REDUCED_TIMING, buildDialPlan, sampleRing } from './ringTimeline';
+import { DEFAULT_TIMING, type DialPlan, REDUCED_TIMING, type RingFrame, buildDialPlan, sampleRing } from './ringTimeline';
 import { RingSound, type Voice } from './sound';
 
 const SOUND_PREF_KEY = 'farpoint.sound';
@@ -58,7 +58,14 @@ export function prefersReducedMotion(): boolean {
 
 export class DialPlayer {
   private angle = 0;
-  private running: { plan: DialPlan; t0: number; voice: Voice | null; resolve: () => void; raf: number } | null = null;
+  private running: {
+    plan: DialPlan;
+    t0: number;
+    voice: Voice | null;
+    resolve: () => void;
+    raf: number;
+    onFrame?: (frame: RingFrame) => void;
+  } | null = null;
   private lastPlan: DialPlan | null = null;
 
   constructor(private readonly ring: RingView) {}
@@ -67,7 +74,8 @@ export class DialPlayer {
     return this.running !== null;
   }
 
-  play(guess: readonly GlyphId[], marks: readonly Mark[]): Promise<void> {
+  /** `onFrame` receives every rendered frame, so other UI can stay in sync with the ring. */
+  play(guess: readonly GlyphId[], marks: readonly Mark[], onFrame?: (frame: RingFrame) => void): Promise<void> {
     this.finish(false);
     const reduced = prefersReducedMotion();
     this.ring.reducedMotion = reduced;
@@ -80,14 +88,16 @@ export class DialPlayer {
       const tick = () => {
         if (!this.running) return;
         const t = performance.now() - t0;
-        this.ring.render(sampleRing(plan, t), performance.now());
+        const frame = sampleRing(plan, t);
+        this.ring.render(frame, performance.now());
+        onFrame?.(frame);
         if (t >= plan.totalMs) {
           this.finish(false);
           return;
         }
         this.running.raf = requestAnimationFrame(tick);
       };
-      this.running = { plan, t0, voice, resolve, raf: requestAnimationFrame(tick) };
+      this.running = { plan, t0, voice, resolve, raf: requestAnimationFrame(tick), onFrame };
     });
   }
 
@@ -107,7 +117,9 @@ export class DialPlayer {
     }
     this.angle = r.plan.finalAngle;
     this.lastPlan = r.plan;
-    this.ring.render(sampleRing(r.plan, r.plan.totalMs), performance.now());
+    const last = sampleRing(r.plan, r.plan.totalMs);
+    this.ring.render(last, performance.now());
+    r.onFrame?.(last);
     if (r.plan.success) this.idleVeil();
     r.resolve();
   }

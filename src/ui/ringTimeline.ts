@@ -309,6 +309,14 @@ export function sampleRing(plan: DialPlan, tMs: number): RingFrame {
   };
 }
 
+/**
+ * The mark each slot has revealed so far in this frame (null until its
+ * chevron is struck). Energy chevrons count as locked.
+ */
+export function revealedMarks(frame: RingFrame): (Mark | null)[] {
+  return frame.chevrons.map((c) => (c.light === 'energy' ? 'locked' : c.light === 'dark' || c.light === 'armed' ? null : c.light));
+}
+
 /** When chevron `slot` converts to energy during a successful finale. */
 export function chargeTime(plan: DialPlan, slot: number): number {
   const gather = (plan.totalMs - plan.finaleStart) * 0.25;

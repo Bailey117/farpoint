@@ -7,6 +7,7 @@
 import { type Mark, describeFact } from '../game/address';
 import {
   type AidKind,
+  type Attempt,
   type DecodeState,
   type DialError,
   type AidError,
@@ -18,6 +19,7 @@ import {
 import { GLYPH_IDS, type GlyphId, glyphName } from '../game/glyphs';
 import { h } from './dom';
 import { glyphSvg } from './glyphArt';
+import { revealedMarks } from './ringTimeline';
 import { DialPlayer, isSoundOn, setSoundOn } from './dialPlayer';
 import { RingView } from './ringView';
 
@@ -32,7 +34,10 @@ const MARK_LABEL: Record<Mark, string> = {
   absent: 'Absent: not in the address',
 };
 
-const MARK_SYMBOL: Record<Mark, string> = { locked: '●', drifting: '◐', absent: '○' };
+/** Shape-coded mark (filled / half / hollow) so marks never rely on colour alone. */
+function markDot(m: Mark): HTMLElement {
+  return h('span', { class: `dot dot-${m}`, 'aria-hidden': 'true' });
+}
 
 const AID_INFO: Record<AidKind, { title: string; text: string }> = {
   reveal: { title: 'Resonance key', text: 'Reveal one unknown slot' },
@@ -54,6 +59,8 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
   let message = '';
   /** True while the ring animation plays; the newest attempt stays hidden until it ends. */
   let dialing = false;
+  /** The last dial, shown in the slot row with its marks until the player edits again. */
+  let result: Attempt | null = null;
 
   if (!sharedRing) {
     const view = new RingView(initial.address.length);
@@ -87,6 +94,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
 
   function placeGlyph(g: GlyphId) {
     if (state.status === 'solved') return;
+    result = null;
     const existing = draft.indexOf(g);
     if (existing !== -1) draft[existing] = null;
     draft[cursor] = g;
@@ -96,6 +104,12 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
   }
 
   function clearSlot(i: number) {
+    // The first click on a shown result just returns to editing.
+    if (result) {
+      result = null;
+      render();
+      return;
+    }
     if (draft[i]) draft[i] = null;
     cursor = i;
     render();
@@ -117,10 +131,27 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     state = r.state;
     const last = state.attempts[state.attempts.length - 1]!;
     dialing = true;
+    result = null;
     message = 'Dialing… (click the ring or press Space to skip)';
     render();
-    await player.play(last.guess, last.marks);
+    // Light each slot on the exact frame its chevron is struck.
+    const slotEls = Array.from(root.querySelectorAll<HTMLButtonElement>('.slot'));
+    const lit: (Mark | null)[] = slotEls.map(() => null);
+    await player.play(last.guess, last.marks, (frame) => {
+      const marks = revealedMarks(frame);
+      slotEls.forEach((el, i) => {
+        const m = marks[i] ?? null;
+        el.classList.toggle('active', frame.activeSlot === i && m === null);
+        if (m && !lit[i]) {
+          lit[i] = m;
+          el.classList.add('revealed', `mark-${m}`, 'hit');
+          el.title = `Slot ${i + 1}: ${glyphName(last.guess[i]!)} — ${MARK_LABEL[m]}`;
+          el.append(h('span', { class: 'slot-pip' }, markDot(m)));
+        }
+      });
+    });
     dialing = false;
+    result = last;
     // Keep locked glyphs in place, clear the rest for the next attempt.
     resetDraft();
     message =
@@ -131,6 +162,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
   }
 
   function doAid(aid: AidKind) {
+    result = null;
     const r = useAid(state, aid);
     if (!r.ok) {
       message = aidErrorText(r.error);
@@ -185,25 +217,44 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     const slots = h(
       'div',
       { class: 'slots', role: 'group', 'aria-label': 'Dial attempt', style: `grid-template-columns: repeat(${draft.length}, minmax(0, 1fr))` },
-      draft.map((g, i) => {
-        const warn =
-          g !== null &&
-          (k.glyphStatus[g] === 'absent' || k.slotExcluded[i]?.has(g) || (k.slotGlyph[i] !== null && k.slotGlyph[i] !== g));
-        const cls = ['slot', i === cursor ? 'cursor' : '', g && k.slotGlyph[i] === g ? 'known' : '', warn ? 'warn' : '']
-          .filter(Boolean)
-          .join(' ');
-        return h(
-          'button',
-          {
-            class: cls,
-            title: g ? `Slot ${i + 1}: ${glyphName(g)}${warn ? ' (contradicts what you know)' : ''} — click to clear` : `Slot ${i + 1}: empty`,
-            disabled: dialing,
-            onclick: () => clearSlot(i),
-          },
-          h('span', { class: 'slot-num' }, String(i + 1)),
-          g ? glyphSvg(g) : h('span', { class: 'slot-empty' }, '·'),
-        );
-      }),
+      result
+        ? result.guess.map((g, i) => {
+            const m = result!.marks[i] as Mark;
+            return h(
+              'button',
+              { class: `slot revealed mark-${m}`, title: `Slot ${i + 1}: ${glyphName(g)} — ${MARK_LABEL[m]}`, onclick: () => clearSlot(i) },
+              h('span', { class: 'slot-num' }, String(i + 1)),
+              glyphSvg(g),
+              h('span', { class: 'slot-pip' }, markDot(m)),
+            );
+          })
+        : draft.map((g, i) => {
+            if (dialing) {
+              // Neutral while the ring reveals the result.
+              return h(
+                'button',
+                { class: 'slot', title: `Slot ${i + 1}`, disabled: true },
+                h('span', { class: 'slot-num' }, String(i + 1)),
+                g ? glyphSvg(g) : h('span', { class: 'slot-empty' }, '·'),
+              );
+            }
+            const warn =
+              g !== null &&
+              (k.glyphStatus[g] === 'absent' || k.slotExcluded[i]?.has(g) || (k.slotGlyph[i] !== null && k.slotGlyph[i] !== g));
+            const cls = ['slot', i === cursor ? 'cursor' : '', g && k.slotGlyph[i] === g ? 'known' : '', warn ? 'warn' : '']
+              .filter(Boolean)
+              .join(' ');
+            return h(
+              'button',
+              {
+                class: cls,
+                title: g ? `Slot ${i + 1}: ${glyphName(g)}${warn ? ' (contradicts what you know)' : ''} — click to clear` : `Slot ${i + 1}: empty`,
+                onclick: () => clearSlot(i),
+              },
+              h('span', { class: 'slot-num' }, String(i + 1)),
+              g ? glyphSvg(g) : h('span', { class: 'slot-empty' }, '·'),
+            );
+          }),
     );
 
     const controls = h(
@@ -216,7 +267,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
             { class: 'primary', disabled: !affordable, onclick: () => void doDial() },
             state.status === 'solved' ? 'Address complete' : `Dial (${cost} power)`,
           ),
-      h('button', { disabled: dialing, onclick: () => { resetDraft(); render(); } }, 'Reset'),
+      h('button', { disabled: dialing, onclick: () => { result = null; resetDraft(); render(); } }, 'Reset'),
     );
 
     const palette = h(
@@ -272,7 +323,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
       h(
         'p',
         { class: 'legend' },
-        (['locked', 'drifting', 'absent'] as Mark[]).map((m) => h('span', { class: `mark mark-${m}` }, `${MARK_SYMBOL[m]} ${m}`)),
+        (['locked', 'drifting', 'absent'] as Mark[]).map((m) => h('span', { class: `mark mark-${m}` }, markDot(m), ` ${m}`)),
       ),
       shown.attempts.length === 0
         ? h('p', { class: 'muted' }, 'No attempts yet.')
@@ -287,7 +338,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
                   h('span', { class: 'attempt-num' }, `#${n + 1}`),
                   a.guess.map((g, i) => {
                     const m = a.marks[i] as Mark;
-                    return h('span', { class: `cell mark-${m}`, title: `${glyphName(g)}: ${MARK_LABEL[m]}` }, glyphSvg(g), h('span', { class: 'pip' }, MARK_SYMBOL[m]));
+                    return h('span', { class: `cell mark-${m}`, title: `${glyphName(g)}: ${MARK_LABEL[m]}` }, glyphSvg(g), h('span', { class: 'pip' }, markDot(m)));
                   }),
                   h('span', { class: 'attempt-cost' }, a.cost === 0 ? 'free' : `−${a.cost}`),
                 ),

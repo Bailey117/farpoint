@@ -112,7 +112,7 @@ h2 { font-size: 0.85rem; margin: 16px 0 8px; letter-spacing: 0.12em; text-transf
 .attempt-num, .attempt-cost { font-size: 0.75rem; color: var(--muted); width: 3ch; flex: none; }
 .attempt-cost { width: auto; margin-left: 6px; }
 .cell { position: relative; width: 38px; height: 38px; padding: 5px; border: 2px solid; border-radius: 6px; background: var(--bg); flex: none; }
-.cell .pip { position: absolute; bottom: -7px; right: -5px; font-size: 0.7rem; background: var(--panel); border-radius: 50%; line-height: 1; }
+.cell .pip { position: absolute; bottom: -6px; right: -6px; display: grid; place-items: center; width: 14px; height: 14px; background: var(--panel); border-radius: 50%; }
 .mark-locked { color: var(--locked); border-color: var(--locked); }
 .mark-drifting { color: var(--drifting); border-color: var(--drifting); }
 .mark-absent { color: var(--absent); border-color: var(--absent); }
@@ -128,3 +128,28 @@ h2 { font-size: 0.85rem; margin: 16px 0 8px; letter-spacing: 0.12em; text-transf
 .ring { width: 100%; height: 100%; display: block; overflow: visible; }
 .sound-toggle { padding: 4px 10px; font-size: 0.8rem; }
 .sound-toggle[aria-pressed='false'] { color: var(--muted); }
+
+/* Slot row: revealed in sync with the ring */
+.slot:disabled { opacity: 1; cursor: default; }
+.slot.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.25), 0 0 18px rgba(77, 163, 255, 0.35); }
+.slot.revealed.mark-locked { color: var(--locked); border-color: var(--locked); background: rgba(79, 195, 138, 0.12); }
+.slot.revealed.mark-drifting { color: var(--drifting); border-color: var(--drifting); background: rgba(224, 182, 75, 0.12); }
+.slot.revealed.mark-absent { color: var(--absent); border-color: var(--absent); background: var(--bg); }
+.slot-pip { position: absolute; bottom: 5px; right: 6px; line-height: 0; }
+.slot.hit { animation: slot-hit 420ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+.slot.hit.mark-locked { --hit-glow: rgba(79, 195, 138, 0.7); }
+.slot.hit.mark-drifting { --hit-glow: rgba(224, 182, 75, 0.7); }
+.slot.hit.mark-absent { --hit-glow: rgba(107, 117, 132, 0.5); }
+@keyframes slot-hit {
+  0% { transform: scale(1.14); box-shadow: 0 0 0 4px var(--hit-glow), 0 0 26px var(--hit-glow); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot.hit { animation: none; }
+}
+
+/* Mark dots: filled = locked, half = drifting, hollow = absent */
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; vertical-align: -1px; }
+.dot-locked { background: currentColor; }
+.dot-drifting { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+.dot-absent { background: transparent; }
