@@ -1,7 +1,7 @@
 import './ui/styles.css';
 import { createDecode } from './game/decode';
 import { deriveSeed } from './game/rng';
-import { mountDecodeView } from './ui/decodeView';
+import { type MountedView, mountDecodeView } from './ui/decodeView';
 
 const root = document.getElementById('app');
 if (!root) throw new Error('#app missing');
@@ -15,8 +15,11 @@ function currentSeed(): string {
   return fresh;
 }
 
+let mounted: MountedView | null = null;
+
 function start(seed: string) {
-  mountDecodeView(root!, createDecode(seed), {
+  mounted?.dispose();
+  mounted = mountDecodeView(root!, createDecode(seed), {
     seedLabel: seed,
     onNewPuzzle: () => {
       const next = deriveSeed(seed, 'next-puzzle').toString(36);

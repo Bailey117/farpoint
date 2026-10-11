@@ -18,6 +18,8 @@ import {
 import { GLYPH_IDS, type GlyphId, glyphName } from '../game/glyphs';
 import { h } from './dom';
 import { glyphSvg } from './glyphArt';
+import { DialPlayer, isSoundOn, setSoundOn } from './dialPlayer';
+import { RingView } from './ringView';
 
 export interface DecodeViewOptions {
   seedLabel: string;
@@ -38,11 +40,38 @@ const AID_INFO: Record<AidKind, { title: string; text: string }> = {
   freeDial: { title: 'Capacitor', text: 'Next dial costs no power' },
 };
 
-export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: DecodeViewOptions): void {
+export interface MountedView {
+  dispose(): void;
+}
+
+/** One ring per page, so its angle carries over between puzzles. */
+let sharedRing: { view: RingView; player: DialPlayer } | null = null;
+
+export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: DecodeViewOptions): MountedView {
   let state = initial;
   let draft: (GlyphId | null)[] = [];
   let cursor = 0;
   let message = '';
+  /** True while the ring animation plays; the newest attempt stays hidden until it ends. */
+  let dialing = false;
+
+  if (!sharedRing) {
+    const view = new RingView(initial.address.length);
+    sharedRing = { view, player: new DialPlayer(view) };
+  }
+  const { view: ring, player } = sharedRing;
+  player.reset(initial.address.length);
+  ring.el.onclick = () => {
+    if (dialing) player.skip();
+  };
+
+  const onKey = (e: KeyboardEvent) => {
+    if (dialing && (e.key === ' ' || e.key === 'Escape' || e.key === 'Enter')) {
+      e.preventDefault();
+      player.skip();
+    }
+  };
+  document.addEventListener('keydown', onKey);
 
   const resetDraft = () => {
     const k = deriveKnowledge(state);
@@ -72,7 +101,8 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     render();
   }
 
-  function doDial() {
+  async function doDial() {
+    if (dialing) return;
     if (draft.some((g) => g === null)) {
       message = 'Fill every slot before dialing.';
       render();
@@ -86,6 +116,11 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     }
     state = r.state;
     const last = state.attempts[state.attempts.length - 1]!;
+    dialing = true;
+    message = 'Dialing… (click the ring or press Space to skip)';
+    render();
+    await player.play(last.guess, last.marks);
+    dialing = false;
     // Keep locked glyphs in place, clear the rest for the next attempt.
     resetDraft();
     message =
@@ -117,7 +152,11 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
   }
 
   function render() {
-    const k = deriveKnowledge(state);
+    // While dialing, the result is not revealed anywhere but on the ring.
+    const shown: DecodeState = dialing
+      ? { ...state, attempts: state.attempts.slice(0, -1), status: 'active' }
+      : state;
+    const k = deriveKnowledge(shown);
     const affordable = canDial(state);
     const cost = state.freeDials > 0 ? 0 : state.dialCost;
 
@@ -127,6 +166,19 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
       h('h1', {}, 'Farpoint'),
       h('span', { class: 'subtitle' }, 'Address decode'),
       h('span', { class: 'seed', title: 'Puzzle seed' }, `seed ${opts.seedLabel}`),
+      h(
+        'button',
+        {
+          class: 'sound-toggle',
+          'aria-pressed': isSoundOn() ? 'true' : 'false',
+          title: 'Toggle sound',
+          onclick: () => {
+            setSoundOn(!isSoundOn());
+            render();
+          },
+        },
+        isSoundOn() ? 'Sound on' : 'Sound off',
+      ),
       powerMeter(state.power, Math.max(initial.power, state.power)),
     );
 
@@ -145,6 +197,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
           {
             class: cls,
             title: g ? `Slot ${i + 1}: ${glyphName(g)}${warn ? ' (contradicts what you know)' : ''} — click to clear` : `Slot ${i + 1}: empty`,
+            disabled: dialing,
             onclick: () => clearSlot(i),
           },
           h('span', { class: 'slot-num' }, String(i + 1)),
@@ -156,12 +209,14 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     const controls = h(
       'div',
       { class: 'controls' },
-      h(
-        'button',
-        { class: 'primary', disabled: !affordable, onclick: doDial },
-        state.status === 'solved' ? 'Address complete' : `Dial (${cost} power)`,
-      ),
-      h('button', { onclick: () => { resetDraft(); render(); } }, 'Reset'),
+      dialing
+        ? h('button', { class: 'primary', onclick: () => player.skip() }, 'Skip ▸')
+        : h(
+            'button',
+            { class: 'primary', disabled: !affordable, onclick: () => void doDial() },
+            state.status === 'solved' ? 'Address complete' : `Dial (${cost} power)`,
+          ),
+      h('button', { disabled: dialing, onclick: () => { resetDraft(); render(); } }, 'Reset'),
     );
 
     const palette = h(
@@ -173,6 +228,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
           {
             class: `glyph-btn status-${k.glyphStatus[g]} ${draft.includes(g) ? 'in-draft' : ''}`,
             title: `${glyphName(g)} — ${statusText(k.glyphStatus[g])}`,
+            disabled: dialing,
             onclick: () => placeGlyph(g),
           },
           glyphSvg(g),
@@ -189,7 +245,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
           'button',
           {
             class: 'aid',
-            disabled: state.aids[aid] <= 0 || state.status === 'solved',
+            disabled: dialing || state.aids[aid] <= 0 || state.status === 'solved',
             onclick: () => doAid(aid),
             title: AID_INFO[aid].text,
           },
@@ -212,18 +268,18 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     const history = h(
       'section',
       { class: 'panel' },
-      h('h2', {}, `Dial log (${state.attempts.length})`),
+      h('h2', {}, `Dial log (${shown.attempts.length})`),
       h(
         'p',
         { class: 'legend' },
         (['locked', 'drifting', 'absent'] as Mark[]).map((m) => h('span', { class: `mark mark-${m}` }, `${MARK_SYMBOL[m]} ${m}`)),
       ),
-      state.attempts.length === 0
+      shown.attempts.length === 0
         ? h('p', { class: 'muted' }, 'No attempts yet.')
         : h(
             'ol',
             { class: 'attempts', reversed: true },
-            state.attempts
+            shown.attempts
               .map((a, n) =>
                 h(
                   'li',
@@ -241,14 +297,14 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     );
 
     const banner =
-      state.status === 'solved'
-        ? h('div', { class: 'banner success' }, h('strong', {}, 'Address resolved.'), ` Solved in ${state.attempts.length} attempt${state.attempts.length === 1 ? '' : 's'}.`, h('button', { onclick: opts.onNewPuzzle }, 'New address'))
-        : state.status === 'stalled'
+      shown.status === 'solved'
+        ? h('div', { class: 'banner success' }, h('strong', {}, 'Address resolved.'), ` Solved in ${shown.attempts.length} attempt${shown.attempts.length === 1 ? '' : 's'}.`, h('button', { onclick: opts.onNewPuzzle }, 'New address'))
+        : shown.status === 'stalled'
           ? h(
               'div',
               { class: 'banner danger' },
               h('strong', {}, 'Power exhausted.'),
-              state.aids.freeDial > 0 ? ' A Capacitor can still power one more dial.' : ' The ring cannot be dialed again.',
+              shown.aids.freeDial > 0 ? ' A Capacitor can still power one more dial.' : ' The ring cannot be dialed again.',
               h('button', { onclick: opts.onNewPuzzle }, 'New address'),
             )
           : null;
@@ -260,23 +316,41 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
         { class: 'decode' },
         h(
           'section',
-          { class: 'composer panel' },
-          h('h2', {}, 'Compose attempt'),
-          h('p', { class: 'muted' }, 'Pick glyphs to fill the highlighted slot. Click a slot to clear it.'),
+          { class: 'stage panel' },
+          ring.el,
           slots,
           controls,
           h('p', { class: 'message', role: 'status', 'aria-live': 'polite' }, message),
           banner,
-          palette,
-          h('h2', {}, 'Puzzle aids'),
-          aids,
         ),
-        h('div', { class: 'side' }, facts, history),
+        h(
+          'div',
+          { class: 'side' },
+          h(
+            'section',
+            { class: 'panel' },
+            h('h2', {}, 'Glyphs'),
+            h('p', { class: 'muted' }, 'Pick glyphs to fill the highlighted slot. Click a slot to clear it.'),
+            palette,
+            h('h2', {}, 'Puzzle aids'),
+            aids,
+          ),
+          facts,
+          history,
+        ),
       ),
     );
   }
 
   render();
+
+  return {
+    dispose() {
+      document.removeEventListener('keydown', onKey);
+      player.dispose();
+      ring.el.onclick = null;
+    },
+  };
 }
 
 function statusText(s: string): string {
