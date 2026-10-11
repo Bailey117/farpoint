@@ -1,7 +1,8 @@
 /**
- * Expedition screen (standalone test harness until the base screen exists):
- * world briefing with an optional probe, then the encounter chain.
- * All rules live in src/game/expedition.ts.
+ * Expedition screen: briefing (probe, launch, stand down), then the
+ * encounter chain. Controlled by the app: it reads the current world, team
+ * and expedition through `get()` and reports every change back so the run
+ * can be saved. All rules live in src/game/expedition.ts.
  */
 
 import { BIOME_INFO } from '../data/biomes';
@@ -21,36 +22,44 @@ import {
   emergencyDialOut,
   medicTreat,
   returnHome,
-  startExpedition,
   successChance,
 } from '../game/expedition';
-import { Rng, deriveSeed } from '../game/rng';
-import { ROLE_LABEL, STATS, STAT_LABEL, WOUND_LABEL, effectiveStat, generateTeam, isAlive } from '../game/team';
-import { HAZARD_LABEL, type ProbeReport, type World, generateWorld, probeWorld } from '../game/world';
+import { type Member, ROLE_LABEL, STATS, STAT_LABEL, WOUND_LABEL, effectiveStat, isAlive } from '../game/team';
+import { HAZARD_LABEL, type ProbeReport, type World } from '../game/world';
 import { h } from './dom';
 
-const PROBE_COST = 5;
-const START_POWER = 60;
+export const ITEM_LABEL: Record<AidKind, string> = { reveal: 'Resonance key', eliminate: 'Null filter', freeDial: 'Capacitor' };
 
-const ITEM_LABEL: Record<AidKind, string> = { reveal: 'Resonance key', eliminate: 'Null filter', freeDial: 'Capacitor' };
-
-export interface ExpeditionViewOptions {
-  seedLabel: string;
-  /** Starting power (test harness override). */
-  startPower?: number;
-  onNewWorld: () => void;
+export interface ExpeditionSnapshot {
+  world: World;
+  probe: ProbeReport | null;
+  probeCost: number;
+  /** Run power (used in briefing). */
+  power: number;
+  /** Base team (used in briefing). */
+  team: Member[];
+  expedition: ExpeditionState | null;
 }
 
-export function mountExpeditionView(root: HTMLElement, seed: string, opts: ExpeditionViewOptions): { dispose(): void } {
-  const world: World = generateWorld(seed, ENCOUNTERS);
-  const team = generateTeam(new Rng(deriveSeed(seed, 'team')));
-  let power = opts.startPower ?? START_POWER;
-  let probe: ProbeReport | null = null;
-  let exp: ExpeditionState | null = null;
+export interface ExpeditionViewOptions {
+  get(): ExpeditionSnapshot;
+  onProbe(): void;
+  onLaunch(): void;
+  onStandDown(): void;
+  /** Called with every new expedition state. */
+  onExpedition(exp: ExpeditionState): void;
+  /** The expedition has ended and the player is going back to base. */
+  onFinish(): void;
+}
+
+export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptions): { dispose(): void } {
   let lastResolution: Resolution | null = null;
   let message = '';
+  /** Set once the app has moved to another screen (e.g. after standing down). */
+  let disposed = false;
 
-  const nameOf = (id: string) => (exp?.team ?? team).find((m) => m.id === id)?.name ?? id;
+  const snap = () => opts.get();
+  const nameOf = (id: string) => (snap().expedition?.team ?? snap().team).find((m) => m.id === id)?.name ?? id;
 
   function act(fn: () => void) {
     message = '';
@@ -58,63 +67,50 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
     render();
   }
 
-  function doProbe() {
-    if (probe || power < PROBE_COST) return;
-    power -= PROBE_COST;
-    probe = probeWorld(world, ENCOUNTERS);
+  function update(exp: ExpeditionState) {
+    opts.onExpedition(exp);
   }
 
-  function launch() {
-    exp = startExpedition(world, team, power);
-  }
-
-  function take(choice: Choice, actorId: string | null) {
-    if (!exp) return;
+  function take(exp: ExpeditionState, choice: Choice, actorId: string | null) {
     const r = choose(exp, ENCOUNTERS, choice.id, actorId);
     if (!r.ok) {
       message = errorText(r.error);
       return;
     }
-    exp = r.state;
     lastResolution = r.value;
+    update(r.state);
   }
 
   function render() {
-    const header = h(
-      'header',
-      { class: 'topbar' },
-      h('h1', {}, 'Farpoint'),
-      h('span', { class: 'subtitle' }, 'Expedition'),
-      h('span', { class: 'seed' }, `seed ${opts.seedLabel}`),
-      h('a', { class: 'nav-link', href: `?screen=decode&seed=${encodeURIComponent(opts.seedLabel)}` }, 'Decode test'),
-      powerMeter(exp?.power ?? power, START_POWER),
-    );
-
+    if (disposed) return;
+    const s = snap();
+    const exp = s.expedition;
     const story = h('div', { class: 'exp-main' });
-    if (!exp) story.append(briefingPanel());
+    if (!exp) story.append(briefingPanel(s));
     else if (lastResolution && !ENDED.has(exp.status) && exp.status !== 'complete') story.append(resolutionPanel(lastResolution, true));
-    else if (exp.status === 'encounter') story.append(encounterPanel());
-    else story.append(...(lastResolution ? [resolutionPanel(lastResolution, false)] : []), endPanel());
-    if (exp && exp.log.length) story.append(logPanel());
-    root.replaceChildren(header, h('main', { class: 'expedition' }, h('div', { class: 'exp-side' }, worldPanel(), teamPanel()), story));
+    else if (exp.status === 'encounter') story.append(encounterPanel(exp));
+    else story.append(...(lastResolution ? [resolutionPanel(lastResolution, false)] : []), endPanel(exp));
+    if (exp && exp.log.length) story.append(logPanel(exp));
+    root.replaceChildren(h('main', { class: 'expedition' }, h('div', { class: 'exp-side' }, worldPanel(s), teamPanel(s)), story));
   }
 
-  function worldPanel(): HTMLElement {
-    const biome = BIOME_INFO[world.biome];
-    const hazardKnown = probe !== null || exp !== null;
+  function worldPanel(s: ExpeditionSnapshot): HTMLElement {
+    const biome = BIOME_INFO[s.world.biome];
+    const hazardKnown = s.probe !== null || s.expedition !== null;
     return h(
       'section',
       { class: 'panel world-panel' },
       h('h2', {}, 'World'),
-      h('div', { class: 'world-name' }, world.name),
-      h('div', { class: 'world-meta' }, h('strong', {}, biome.name), ' · ', hazardKnown ? `Hazard ${world.hazard} (${HAZARD_LABEL[world.hazard]})` : 'Hazard unknown'),
+      h('div', { class: 'world-name' }, s.world.name),
+      h('div', { class: 'world-meta' }, h('strong', {}, biome.name), ' · ', hazardKnown ? `Hazard ${s.world.hazard} (${HAZARD_LABEL[s.world.hazard]})` : 'Hazard unknown'),
       h('p', { class: 'muted' }, biome.description),
-      exp ? h('div', { class: 'progress' }, progressText(exp)) : null,
+      s.expedition ? h('div', { class: 'progress' }, progressText(s.expedition)) : null,
     );
   }
 
-  function teamPanel(): HTMLElement {
-    const members = exp?.team ?? team;
+  function teamPanel(s: ExpeditionSnapshot): HTMLElement {
+    const exp = s.expedition;
+    const members = exp?.team ?? s.team.filter(isAlive);
     const medicReady = exp && !ENDED.has(exp.status) && !exp.medicUsed && members.some((m) => m.role === 'medic' && isAlive(m) && m.wounds < 2);
     return h(
       'section',
@@ -124,29 +120,10 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
         'div',
         { class: 'team' },
         members.map((m) =>
-          h(
-            'div',
-            { class: `member wounds-${m.wounds}` },
-            h('div', { class: 'member-head' }, h('strong', {}, m.name), h('span', { class: `wound-pill w${m.wounds}` }, WOUND_LABEL[m.wounds])),
-            h('div', { class: 'member-role' }, ROLE_LABEL[m.role]),
-            !isAlive(m)
-              ? h('div', { class: 'stats' }, 'Lost')
-              : h(
-                  'div',
-                  { class: 'stats' },
-                  STATS.map((st) => {
-                    const eff = effectiveStat(m, st);
-                    return h(
-                      'span',
-                      { class: 'stat', title: `${STAT_LABEL[st]}: ${eff} (base ${m.stats[st]})` },
-                      `${STAT_LABEL[st]} `,
-                      h('b', {}, String(eff)),
-                      eff < m.stats[st] ? h('s', {}, String(m.stats[st])) : null,
-                    );
-                  }),
-                ),
+          memberCard(
+            m,
             medicReady && isAlive(m) && m.wounds > 0
-              ? h('button', { class: 'small', onclick: () => act(() => { const r = medicTreat(exp!, m.id); if (r.ok) exp = r.state; else message = errorText(r.error); }) }, 'Medic: treat')
+              ? h('button', { class: 'small', onclick: () => act(() => { const r = medicTreat(exp, m.id); if (r.ok) update(r.state); else message = errorText(r.error); }) }, 'Medic: treat')
               : null,
           ),
         ),
@@ -154,22 +131,28 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
     );
   }
 
-  function briefingPanel(): HTMLElement {
+  function briefingPanel(s: ExpeditionSnapshot): HTMLElement {
+    const team = s.team.filter(isAlive);
     return h(
       'section',
       { class: 'panel encounter' },
       h('h2', {}, 'Briefing'),
-      h('p', {}, `The address is dialled. Before you send the team through, you can probe the far side for ${PROBE_COST} power.`),
-      probe
-        ? h('div', { class: 'probe' }, h('strong', {}, `Probe: hazard ${probe.hazard} (${HAZARD_LABEL[probe.hazard]}).`), ' ', probe.hint)
-        : h('button', { disabled: power < PROBE_COST, onclick: () => act(doProbe) }, `Probe (${PROBE_COST} power)`),
-      h('div', { class: 'controls' }, h('button', { class: 'primary', onclick: () => act(launch) }, 'Send the team through')),
+      h('p', {}, `The ring is open. Before you send the team through, you can probe the far side for ${s.probeCost} power.`),
+      s.probe
+        ? h('div', { class: 'probe' }, h('strong', {}, `Probe: hazard ${s.probe.hazard} (${HAZARD_LABEL[s.probe.hazard]}).`), ' ', s.probe.hint)
+        : h('button', { disabled: s.power < s.probeCost, onclick: () => act(opts.onProbe) }, `Probe (${s.probeCost} power)`),
+      team.length === 0 ? h('p', { class: 'warn-text' }, 'Nobody is fit to go. Stand down and call up a recruit.') : null,
+      h(
+        'div',
+        { class: 'controls' },
+        h('button', { class: 'primary', disabled: team.length === 0, onclick: () => act(opts.onLaunch) }, `Send the team through (${team.length})`),
+        h('button', { onclick: () => act(opts.onStandDown) }, 'Stand down'),
+      ),
       h('p', { class: 'message' }, message),
     );
   }
 
-  function encounterPanel(): HTMLElement {
-    const s = exp!;
+  function encounterPanel(s: ExpeditionState): HTMLElement {
     const enc = currentEncounter(s, ENCOUNTERS)!;
     const living = s.team.filter(isAlive);
     return h(
@@ -202,10 +185,10 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
                     h('span', { class: 'muted small-text' }, 'Who attempts it?'),
                     living.map((m) => {
                       const p = successChance(m, c.check!, s.world.hazard, s.config);
-                      return h('button', { class: 'actor', onclick: () => act(() => take(c, m.id)), title: `${m.name} (${ROLE_LABEL[m.role]})` }, `${m.name.split(' ')[0]} `, h('b', {}, `${Math.round(p * 100)}%`));
+                      return h('button', { class: 'actor', onclick: () => act(() => take(s, c, m.id)), title: `${m.name} (${ROLE_LABEL[m.role]})` }, `${m.name.split(' ')[0]} `, h('b', {}, `${Math.round(p * 100)}%`));
                     }),
                   )
-                : h('button', { class: 'actor', onclick: () => act(() => take(c, null)) }, 'Choose'),
+                : h('button', { class: 'actor', onclick: () => act(() => take(s, c, null)) }, 'Choose'),
           );
         }),
       ),
@@ -214,7 +197,7 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
         { class: 'controls' },
         h(
           'button',
-          { class: 'danger', disabled: s.power < s.config.emergencyCost, onclick: () => act(() => { const r = emergencyDialOut(s); if (r.ok) { exp = r.state; lastResolution = null; } else message = errorText(r.error); }) },
+          { class: 'danger', disabled: s.power < s.config.emergencyCost, onclick: () => act(() => { const r = emergencyDialOut(s); if (r.ok) { lastResolution = null; update(r.state); } else message = errorText(r.error); }) },
           `Emergency dial-out (${s.config.emergencyCost} power)`,
         ),
         !canAffordReturn(s) ? h('span', { class: 'warn-text' }, `Warning: below the ${s.config.returnCost} power needed to dial home.`) : null,
@@ -234,8 +217,7 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
     );
   }
 
-  function endPanel(): HTMLElement {
-    const s = exp!;
+  function endPanel(s: ExpeditionState): HTMLElement {
     if (s.status === 'complete') {
       const affordable = canAffordReturn(s);
       return h(
@@ -243,7 +225,7 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
         { class: 'panel encounter' },
         h('h2', {}, 'Expedition complete'),
         h('p', {}, affordable ? 'The ring is close. Dial home?' : `You have ${s.power} power; dialling home needs ${s.config.returnCost}. If you dial without it, the team will be stranded.`),
-        h('div', { class: 'controls' }, h('button', { class: affordable ? 'primary' : 'danger', onclick: () => act(() => { const r = returnHome(s); if (r.ok) { exp = r.state; lastResolution = null; } }) }, `Dial home (${s.config.returnCost} power)`)),
+        h('div', { class: 'controls' }, h('button', { class: affordable ? 'primary' : 'danger', onclick: () => act(() => { const r = returnHome(s); if (r.ok) { lastResolution = null; update(r.state); } }) }, `Dial home (${s.config.returnCost} power)`)),
       );
     }
     const headline: Record<string, string> = {
@@ -267,14 +249,13 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
             { class: 'effects' },
             h('li', {}, `Salvage: ${haul.salvage}`),
             items.length ? h('li', {}, `Tech: ${items.map((k) => `${ITEM_LABEL[k]} ×${haul.items[k]}`).join(', ')}`) : null,
-            h('li', {}, `Address fragments: ${haul.fragments.length ? haul.fragments.join(', ') : 'none'}`),
-            h('li', {}, `Power remaining: ${s.power}`),
+            h('li', {}, `Address fragments: ${haul.fragments.length}`),
           ),
-      h('div', { class: 'controls' }, h('button', { class: 'primary', onclick: opts.onNewWorld }, 'New world')),
+      h('div', { class: 'controls' }, h('button', { class: 'primary', onclick: opts.onFinish }, 'Return to base')),
     );
   }
 
-  function logPanel(): HTMLElement {
+  function logPanel(s: ExpeditionState): HTMLElement {
     return h(
       'section',
       { class: 'panel log-panel' },
@@ -282,7 +263,7 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
       h(
         'ol',
         { class: 'exp-log' },
-        exp!.log.map((r) => {
+        s.log.map((r) => {
           const enc = ENCOUNTERS.find((d) => d.id === r.encounterId);
           const choice = enc?.choices.find((c) => c.id === r.choiceId);
           return h('li', {}, h('strong', {}, enc?.title ?? r.encounterId), ` — ${choice?.label ?? r.choiceId}`, r.actorId ? ` (${nameOf(r.actorId)})` : '', r.chance === null ? '' : r.success ? ': success' : ': failure');
@@ -292,7 +273,38 @@ export function mountExpeditionView(root: HTMLElement, seed: string, opts: Exped
   }
 
   render();
-  return { dispose() {} };
+  return {
+    dispose() {
+      disposed = true;
+    },
+  };
+}
+
+/** A team member card; `extra` is an optional action row. */
+export function memberCard(m: Member, extra: HTMLElement | null = null): HTMLElement {
+  return h(
+    'div',
+    { class: `member wounds-${m.wounds}` },
+    h('div', { class: 'member-head' }, h('strong', {}, m.name), h('span', { class: `wound-pill w${m.wounds}` }, WOUND_LABEL[m.wounds])),
+    h('div', { class: 'member-role' }, ROLE_LABEL[m.role]),
+    !isAlive(m)
+      ? h('div', { class: 'stats' }, 'Lost')
+      : h(
+          'div',
+          { class: 'stats' },
+          STATS.map((st) => {
+            const eff = effectiveStat(m, st);
+            return h(
+              'span',
+              { class: 'stat', title: `${STAT_LABEL[st]}: ${eff} (base ${m.stats[st]})` },
+              `${STAT_LABEL[st]} `,
+              h('b', {}, String(eff)),
+              eff < m.stats[st] ? h('s', {}, String(m.stats[st])) : null,
+            );
+          }),
+        ),
+    extra,
+  );
 }
 
 function progressText(s: ExpeditionState): string {
@@ -356,15 +368,4 @@ function errorText(e: ExpeditionError): string {
     default:
       return 'That is not possible right now.';
   }
-}
-
-function powerMeter(power: number, max: number): HTMLElement {
-  const pct = Math.max(0, Math.min(100, (power / max) * 100));
-  return h(
-    'div',
-    { class: 'power', title: `Power reserve: ${power}` },
-    h('span', {}, 'Power'),
-    h('div', { class: 'power-bar' }, h('div', { class: 'power-fill', style: `width:${pct}%` })),
-    h('span', { class: 'power-num' }, String(power)),
-  );
 }

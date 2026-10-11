@@ -516,4 +516,119 @@ export const ENCOUNTERS: readonly EncounterDef[] = [
       },
     ],
   },
+
+  // ---------------------------------------------------------------------
+  // The Farpoint (final world). Met in this order.
+  // ---------------------------------------------------------------------
+  {
+    id: 'final-threshold',
+    biome: 'final',
+    title: 'The Threshold',
+    text: 'You step out under a ring ten times the size of your own. Between you and the city beyond, a lattice of pale light hangs in the air and sweeps slowly over each of you in turn. It is asking something.',
+    probeHint: 'An active field of structured light surrounds the arrival point.',
+    choices: [
+      {
+        id: 'answer',
+        label: 'Answer it in the builders\' script',
+        check: { stat: 'rapport', difficulty: 4, favoredRole: 'linguist' },
+        success: { text: '{actor} traces the reply glyph by glyph. The lattice folds aside like a curtain.', effects: [{ kind: 'salvage', amount: [5, 10] }] },
+        failure: { text: 'The lattice tightens around {actor} before it lets go.', effects: [{ kind: 'wound', target: 'actor', amount: 2 }] },
+      },
+      {
+        id: 'force',
+        label: 'Push through before it closes',
+        check: { stat: 'grit', difficulty: 4, favoredRole: 'soldier' },
+        success: { text: '{actor} drives everyone through the gap in one rush.', effects: [] },
+        failure: { text: 'The lattice snaps shut on the last of you.', effects: [{ kind: 'wound', target: 'all', amount: 1, chance: 0.6 }] },
+      },
+      {
+        id: 'overload',
+        label: 'Overload it with your own field cells',
+        powerCost: 15,
+        success: { text: 'The lattice drinks the charge, flickers and goes dark.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'final-silent-city',
+    biome: 'final',
+    title: 'The Silent City',
+    text: 'Streets of black stone run in perfect circles around a distant spire. Every door stands open. Every room is empty. The air tastes of metal and nothing moves.',
+    probeHint: 'A vast, ordered city. No life signs at all.',
+    choices: [
+      {
+        id: 'map',
+        label: 'Work out the city\'s geometry',
+        check: { stat: 'insight', difficulty: 4, favoredRole: 'scientist' },
+        success: { text: '{actor} sees it: the rings of streets are an address, spelled out in stone, and the spire is its last glyph. You walk straight there.', effects: [{ kind: 'salvage', amount: [6, 12] }] },
+        failure: { text: 'The circles fold back on themselves. Hours pass. When you finally reach the spire, {actor} is barely standing.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }, { kind: 'power', amount: -6 }] },
+      },
+      {
+        id: 'march',
+        label: 'Cut straight across, wall by wall',
+        check: { stat: 'grit', difficulty: 4, favoredRole: 'soldier' },
+        success: { text: '{actor} breaks a path through courtyards and gardens of stone.', effects: [] },
+        failure: { text: 'The stone fights back. Something in the walls is still awake, and {target} pays for it.', effects: [{ kind: 'wound', target: 'random', amount: 2 }] },
+      },
+    ],
+  },
+  {
+    id: 'final-heart',
+    biome: 'final',
+    title: 'The Heart of the Network',
+    text: 'Inside the spire, every ring address you have ever seen is carved into one wall, and thousands more besides. Lines of light run between them. The whole network meets here, and your arrival has woken it.',
+    probeHint: 'An enormous energy source at the centre of the city, rising.',
+    choices: [
+      {
+        id: 'stabilise',
+        label: 'Stabilise the surge',
+        check: { stat: 'insight', difficulty: 5, favoredRole: 'scientist' },
+        success: { text: '{actor} finds the rhythm of the surge and steadies it. The wall settles into a calm glow, and the excess flows into your cells.', effects: [{ kind: 'power', amount: 20 }] },
+        failure: { text: 'The surge throws {actor} across the chamber and tears charge from every cell you carry.', effects: [{ kind: 'wound', target: 'actor', amount: 2 }, { kind: 'power', amount: -15 }] },
+      },
+      {
+        id: 'speak',
+        label: 'Read the closing words on the wall',
+        check: { stat: 'rapport', difficulty: 5, favoredRole: 'linguist' },
+        success: { text: '{actor} reads the words aloud. The network listens, and quietly goes back to sleep.', effects: [{ kind: 'heal', target: 'all', amount: 1 }] },
+        failure: { text: 'The words come out wrong. The light turns on all of you.', effects: [{ kind: 'wound', target: 'all', amount: 1 }] },
+      },
+      {
+        id: 'shield',
+        label: 'Shield the team and ride it out',
+        check: { stat: 'grit', difficulty: 4, favoredRole: 'medic' },
+        success: { text: '{actor} keeps everyone down and covered until the surge passes.', effects: [] },
+        failure: { text: 'Not everyone stays covered.', effects: [{ kind: 'wound', target: 'all', amount: 1, chance: 0.5 }] },
+      },
+    ],
+  },
+  {
+    id: 'final-way-home',
+    biome: 'final',
+    title: 'The Way Home',
+    text: 'Back at the great ring, the light behind you is spreading through the city. The ring is turning on its own, faster and faster. If you are going to dial home, it has to be now.',
+    probeHint: 'The arrival ring here shows signs of instability.',
+    choices: [
+      {
+        id: 'run',
+        label: 'Run for it',
+        check: { stat: 'grit', difficulty: 4, favoredRole: 'soldier' },
+        success: { text: '{actor} gets everyone to the ring as it steadies, just long enough.', effects: [] },
+        failure: { text: 'The ground buckles on the way. {target} goes down hard.', effects: [{ kind: 'wound', target: 'random', amount: 2 }] },
+      },
+      {
+        id: 'lock',
+        label: 'Lock the ring by hand',
+        check: { stat: 'insight', difficulty: 4, favoredRole: 'scientist' },
+        success: { text: '{actor} jams the control glyphs and the ring slows, obediently, to a stop.', effects: [{ kind: 'salvage', amount: [4, 8] }] },
+        failure: { text: 'The controls burn under {actor}\'s hands and the ring drains your cells to stabilise itself.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }, { kind: 'power', amount: -10 }] },
+      },
+      {
+        id: 'feed',
+        label: 'Feed it power until it steadies',
+        powerCost: 20,
+        success: { text: 'The ring takes what it needs and settles.', effects: [] },
+      },
+    ],
+  },
 ];

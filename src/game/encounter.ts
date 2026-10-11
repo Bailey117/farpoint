@@ -11,6 +11,8 @@ import { ROLES, type Role, STATS, type Stat } from './team';
 
 export const BIOMES = ['glass', 'tidal', 'spore', 'rime'] as const;
 export type BiomeId = (typeof BIOMES)[number];
+/** The final world has its own encounter pool. */
+export type WorldBiome = BiomeId | 'final';
 
 /** A number or an inclusive [min, max] range rolled with the seeded RNG. */
 export type Amount = number | readonly [number, number];
@@ -58,8 +60,8 @@ export interface Choice {
 
 export interface EncounterDef {
   id: string;
-  /** 'any' encounters can appear in every biome. */
-  biome: BiomeId | 'any';
+  /** 'any' encounters can appear in every ordinary biome; 'final' only on the final world. */
+  biome: WorldBiome | 'any';
   title: string;
   text: string;
   /** What a probe of the world might reveal when this encounter lies ahead. */
@@ -84,7 +86,7 @@ export function validateEncounters(defs: readonly EncounterDef[]): string[] {
     const where = `encounter "${e.id}"`;
     if (ids.has(e.id)) problems.push(`${where}: duplicate id`);
     ids.add(e.id);
-    if (e.biome !== 'any' && !(BIOMES as readonly string[]).includes(e.biome)) problems.push(`${where}: unknown biome ${e.biome}`);
+    if (e.biome !== 'any' && e.biome !== 'final' && !(BIOMES as readonly string[]).includes(e.biome)) problems.push(`${where}: unknown biome ${e.biome}`);
     if (!e.title.trim() || !e.text.trim() || !e.probeHint.trim()) problems.push(`${where}: missing title, text or probeHint`);
     if (e.choices.length < 2 || e.choices.length > 3) problems.push(`${where}: needs 2-3 choices, has ${e.choices.length}`);
     const choiceIds = new Set<string>();

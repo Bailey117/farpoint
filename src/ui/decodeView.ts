@@ -20,12 +20,18 @@ import { GLYPH_IDS, type GlyphId, glyphName } from '../game/glyphs';
 import { h } from './dom';
 import { glyphSvg } from './glyphArt';
 import { revealedMarks } from './ringTimeline';
-import { DialPlayer, isSoundOn, setSoundOn } from './dialPlayer';
-import { RingView } from './ringView';
+import { sharedRing } from './ringStage';
 
 export interface DecodeViewOptions {
-  seedLabel: string;
-  onNewPuzzle: () => void;
+  /** Heading for the puzzle, e.g. the lead's name. */
+  title: string;
+  /** Called after every state change (dial, aid), for saving. */
+  onChange?: (state: DecodeState) => void;
+  /** Leave the puzzle (back to base). */
+  onExit?: () => void;
+  /** After the address is solved and the ring has finished dialling. */
+  onContinue?: () => void;
+  continueLabel?: string;
 }
 
 const MARK_LABEL: Record<Mark, string> = {
@@ -49,9 +55,6 @@ export interface MountedView {
   dispose(): void;
 }
 
-/** One ring per page, so its angle carries over between puzzles. */
-let sharedRing: { view: RingView; player: DialPlayer } | null = null;
-
 export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: DecodeViewOptions): MountedView {
   let state = initial;
   let draft: (GlyphId | null)[] = [];
@@ -62,11 +65,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
   /** The last dial, shown in the slot row with its marks until the player edits again. */
   let result: Attempt | null = null;
 
-  if (!sharedRing) {
-    const view = new RingView(initial.address.length);
-    sharedRing = { view, player: new DialPlayer(view) };
-  }
-  const { view: ring, player } = sharedRing;
+  const { view: ring, player } = sharedRing(initial.address.length);
   player.reset(initial.address.length);
   ring.el.onclick = () => {
     if (dialing) player.skip();
@@ -129,6 +128,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
       return;
     }
     state = r.state;
+    opts.onChange?.(state);
     const last = state.attempts[state.attempts.length - 1]!;
     dialing = true;
     result = null;
@@ -168,6 +168,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
       message = aidErrorText(r.error);
     } else {
       state = r.state;
+      opts.onChange?.(state);
       const k = deriveKnowledge(state);
       // Drop newly revealed glyphs into their slots without wiping the draft.
       k.slotGlyph.forEach((g, i) => {
@@ -191,29 +192,6 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     const k = deriveKnowledge(shown);
     const affordable = canDial(state);
     const cost = state.freeDials > 0 ? 0 : state.dialCost;
-
-    const header = h(
-      'header',
-      { class: 'topbar' },
-      h('h1', {}, 'Farpoint'),
-      h('span', { class: 'subtitle' }, 'Address decode'),
-      h('span', { class: 'seed', title: 'Puzzle seed' }, `seed ${opts.seedLabel}`),
-      h('a', { class: 'nav-link', href: `?screen=expedition&seed=${encodeURIComponent(opts.seedLabel)}` }, 'Expedition test'),
-      h(
-        'button',
-        {
-          class: 'sound-toggle',
-          'aria-pressed': isSoundOn() ? 'true' : 'false',
-          title: 'Toggle sound',
-          onclick: () => {
-            setSoundOn(!isSoundOn());
-            render();
-          },
-        },
-        isSoundOn() ? 'Sound on' : 'Sound off',
-      ),
-      powerMeter(state.power, Math.max(initial.power, state.power)),
-    );
 
     const slots = h(
       'div',
@@ -350,25 +328,36 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
 
     const banner =
       shown.status === 'solved'
-        ? h('div', { class: 'banner success' }, h('strong', {}, 'Address resolved.'), ` Solved in ${shown.attempts.length} attempt${shown.attempts.length === 1 ? '' : 's'}.`, h('button', { onclick: opts.onNewPuzzle }, 'New address'))
+        ? h(
+            'div',
+            { class: 'banner success' },
+            h('strong', {}, 'Address resolved.'),
+            ` Solved in ${shown.attempts.length} attempt${shown.attempts.length === 1 ? '' : 's'}.`,
+            opts.onContinue ? h('button', { class: 'primary', onclick: opts.onContinue }, opts.continueLabel ?? 'Step through') : null,
+          )
         : shown.status === 'stalled'
           ? h(
               'div',
               { class: 'banner danger' },
-              h('strong', {}, 'Power exhausted.'),
-              shown.aids.freeDial > 0 ? ' A Capacitor can still power one more dial.' : ' The ring cannot be dialed again.',
-              h('button', { onclick: opts.onNewPuzzle }, 'New address'),
+              h('strong', {}, 'Not enough power.'),
+              shown.aids.freeDial > 0 ? ' A Capacitor can still power one more dial.' : ' Convert salvage at the base generator to keep dialling.',
+              opts.onExit ? h('button', { onclick: opts.onExit }, 'Back to base') : null,
             )
           : null;
 
     root.replaceChildren(
-      header,
       h(
         'main',
         { class: 'decode' },
         h(
           'section',
           { class: 'stage panel' },
+          h(
+            'div',
+            { class: 'stage-head' },
+            opts.onExit ? h('button', { class: 'small', disabled: dialing, onclick: opts.onExit }, '← Base') : null,
+            h('h2', {}, opts.title),
+          ),
           ring.el,
           slots,
           controls,
@@ -418,16 +407,6 @@ function statusText(s: string): string {
   }
 }
 
-function powerMeter(power: number, max: number): HTMLElement {
-  const pct = Math.max(0, Math.min(100, (power / max) * 100));
-  return h(
-    'div',
-    { class: 'power', title: `Power reserve: ${power}` },
-    h('span', {}, 'Power'),
-    h('div', { class: 'power-bar' }, h('div', { class: 'power-fill', style: `width:${pct}%` })),
-    h('span', { class: 'power-num' }, String(power)),
-  );
-}
 
 function dialErrorText(e: DialError): string {
   switch (e.kind) {

@@ -1,11 +1,11 @@
-import type { BiomeId } from '../game/encounter';
+import type { WorldBiome } from '../game/encounter';
 
 export interface BiomeInfo {
   name: string;
   description: string;
 }
 
-export const BIOME_INFO: Record<BiomeId, BiomeInfo> = {
+export const BIOME_INFO: Record<WorldBiome, BiomeInfo> = {
   glass: {
     name: 'Glass Barrens',
     description: 'Dunes fused into sheets of green glass by some ancient heat. Blinding by day, ringing with wind by night.',
@@ -21,6 +21,10 @@ export const BIOME_INFO: Record<BiomeId, BiomeInfo> = {
   rime: {
     name: 'Rimeveil',
     description: 'A white world of wind-carved ice and buried towers. Sound carries strangely in the cold.',
+  },
+  final: {
+    name: 'The Farpoint',
+    description: 'The world every address in the network was built to reach. No one alive has seen it.',
   },
 };
 

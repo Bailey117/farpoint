@@ -4,7 +4,7 @@
  */
 
 import { WORLD_SYLLABLES } from '../data/biomes';
-import { BIOMES, type BiomeId, type EncounterDef } from './encounter';
+import { BIOMES, type BiomeId, type EncounterDef, type WorldBiome } from './encounter';
 import { Rng, type Seed, deriveSeed } from './rng';
 
 export const MIN_ENCOUNTERS = 3;
@@ -13,7 +13,7 @@ export const MAX_ENCOUNTERS = 6;
 export interface World {
   seed: number;
   name: string;
-  biome: BiomeId;
+  biome: WorldBiome;
   /** 1 (benign) .. 5 (lethal). Raises check difficulty and chain length. */
   hazard: number;
   /** Encounter ids in the order they will be met. */
@@ -28,8 +28,8 @@ export function worldName(rng: Rng): string {
 }
 
 /** Encounters that can appear in a biome. */
-export function poolFor(biome: BiomeId, defs: readonly EncounterDef[]): EncounterDef[] {
-  return defs.filter((d) => d.biome === biome || d.biome === 'any');
+export function poolFor(biome: WorldBiome, defs: readonly EncounterDef[]): EncounterDef[] {
+  return defs.filter((d) => d.biome === biome || (d.biome === 'any' && biome !== 'final'));
 }
 
 /** Weighted draw of `count` distinct encounters. */
@@ -66,6 +66,13 @@ export function generateWorld(seed: Seed, defs: readonly EncounterDef[], opts: W
   if (pool.length < length) throw new Error(`Biome ${biome} has only ${pool.length} encounters; need ${length}`);
   const encounters = drawEncounters(new Rng(deriveSeed(seed, 'encounters')), pool, length);
   return { seed: typeof seed === 'number' ? seed >>> 0 : deriveSeed(seed, 'id'), name, biome, hazard, encounters };
+}
+
+/** The final world: hazard 5, its whole chain drawn from the 'final' pool in order. */
+export function generateFinalWorld(seed: Seed, defs: readonly EncounterDef[]): World {
+  const encounters = defs.filter((d) => d.biome === 'final').map((d) => d.id);
+  if (encounters.length < MIN_ENCOUNTERS) throw new Error('Not enough final encounters');
+  return { seed: deriveSeed(seed, 'final-world'), name: 'Farpoint', biome: 'final', hazard: 5, encounters };
 }
 
 export interface ProbeReport {

@@ -173,3 +173,39 @@ export function generateFragmentFacts(rng: Rng, address: Address, spec: Fragment
   }
   return facts;
 }
+
+/**
+ * One new fact about `address` that is not already in `known`, for a
+ * recovered fragment. 'major' reveals an unknown slot outright (falling back
+ * to a clue when every slot is known); 'minor' gives a partial clue.
+ * `knownSlots` lists slots the player already knows by other means (e.g. a
+ * locked dial result). Returns null when nothing new can be said.
+ */
+export function extraFact(
+  rng: Rng,
+  address: Address,
+  known: readonly Fact[],
+  strength: 'major' | 'minor',
+  knownSlots: ReadonlySet<number> = new Set(),
+): Fact | null {
+  const keys = new Set(known.map(factKey));
+  const slotKnown = (i: number) => knownSlots.has(i) || known.some((f) => f.kind === 'inSlot' && f.slot === i);
+  const hidden = address.map((_, i) => i).filter((i) => !slotKnown(i));
+
+  if (strength === 'major' && hidden.length > 0) {
+    const slot = rng.pick(hidden);
+    return { kind: 'inSlot', glyph: address[slot] as GlyphId, slot };
+  }
+
+  const candidates: Fact[] = [];
+  for (const g of GLYPH_IDS) {
+    if (!address.includes(g)) candidates.push({ kind: 'absent', glyph: g });
+  }
+  for (const i of hidden) {
+    const glyph = address[i] as GlyphId;
+    candidates.push({ kind: 'present', glyph });
+    for (const s of hidden) if (s !== i) candidates.push({ kind: 'notInSlot', glyph, slot: s });
+  }
+  const fresh = candidates.filter((f) => !keys.has(factKey(f)));
+  return fresh.length ? rng.pick(fresh) : null;
+}

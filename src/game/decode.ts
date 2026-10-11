@@ -85,7 +85,8 @@ export function canDial(state: DecodeState): boolean {
   return state.status === 'active' && (state.freeDials > 0 || state.power >= state.dialCost);
 }
 
-function withStatus(state: DecodeState): DecodeState {
+/** Recompute `status` from attempts, power and free dials. */
+export function withStatus(state: DecodeState): DecodeState {
   const last = state.attempts[state.attempts.length - 1];
   let status: DecodeStatus;
   if (last && isSolved(last.marks)) status = 'solved';
