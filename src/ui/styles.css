@@ -24,7 +24,18 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; font-size: 16px; line-height: 1.45; min-height: 100vh; background: radial-gradient(ellipse at top, #1a2330, var(--bg) 60%); }
+/* Set text colour and font on body itself: hosts (e.g. an artifact viewer) may
+   reset body styles, and everything inherits from here. */
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--text);
+  min-height: 100vh;
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at top, #1a2330, var(--bg) 60%);
+}
 
 button {
   font: inherit;
