@@ -95,6 +95,22 @@ export interface KnownWorld {
   hazard: number;
   address: GlyphId[];
   visits: number;
+  /**
+   * Whether the world's name and biome are known: set by probing it or by
+   * going through. Saves from before this field existed count as identified.
+   */
+  identified?: boolean;
+}
+
+/** Is this world's name known to the player yet? */
+export function isIdentified(run: RunState, leadId: string): boolean {
+  return run.worlds.find((w) => w.leadId === leadId)?.identified !== false;
+}
+
+/** Mark a world as identified (probed or visited). */
+function identify(run: RunState, leadId: string): RunState {
+  if (isIdentified(run, leadId)) return run;
+  return { ...run, worlds: run.worlds.map((w) => (w.leadId === leadId ? { ...w, identified: true } : w)) };
 }
 
 /** A world the ring is open to: in briefing until launch, then on expedition. */
@@ -360,9 +376,10 @@ export function applyDecode(run: RunState, leadId: string, ds: DecodeState, defs
   };
   if (updated.solved && !lead.solved) {
     const world = lead.final ? generateFinalWorld(lead.worldSeed, defs) : generateWorld(lead.worldSeed, defs);
-    next = note({ ...next, excursion: { leadId, world, probe: null, expedition: null } }, lead.final ? 'The final address locks. The ring opens on the Farpoint.' : `Address resolved: the ring opens on ${world.name}.`);
+    next = note({ ...next, excursion: { leadId, world, probe: null, expedition: null } }, lead.final ? 'The final address locks. The ring opens on the Farpoint.' : 'Address resolved: the ring opens on an unidentified world.');
     if (!next.worlds.some((w) => w.leadId === leadId)) {
-      next.worlds = [...next.worlds, { leadId, name: world.name, biome: world.biome, hazard: world.hazard, address: lead.address, visits: 0 }];
+      // The Farpoint is known by name from the start; other worlds must be probed or visited.
+      next.worlds = [...next.worlds, { leadId, name: world.name, biome: world.biome, hazard: world.hazard, address: lead.address, visits: 0, identified: lead.final }];
     }
   }
   return { ok: true, run: settle(next, RUN_CONFIG) };
@@ -391,7 +408,7 @@ export function dialKnownWorld(run: RunState, leadId: string, defs: readonly Enc
         stats: { ...run.stats, dials: run.stats.dials + 1 },
         excursion: { leadId, world, probe: null, expedition: null },
       },
-      `The ring opens on ${world.name} again.`,
+      isIdentified(run, leadId) ? `The ring opens on ${world.name} again.` : 'The ring opens on the unidentified world again.',
     ),
   };
 }
@@ -412,7 +429,10 @@ export function probe(run: RunState, defs: readonly EncounterDef[] = ENCOUNTERS,
   const ex = run.excursion;
   if (run.status !== 'active' || !ex || ex.expedition || ex.probe) return fail({ kind: 'busy' });
   if (run.power < config.probeCost) return fail({ kind: 'no-power', needed: config.probeCost, have: run.power });
-  return { ok: true, run: { ...run, power: run.power - config.probeCost, excursion: { ...ex, probe: probeWorld(ex.world, defs) } } };
+  const wasKnown = isIdentified(run, ex.leadId);
+  let next: RunState = identify({ ...run, power: run.power - config.probeCost, excursion: { ...ex, probe: probeWorld(ex.world, defs) } }, ex.leadId);
+  if (!wasKnown) next = note(next, `The probe identifies the world: ${ex.world.name}.`);
+  return { ok: true, run: next };
 }
 
 /** If no ordinary lead is open, the archive yields a new one. */
@@ -427,7 +447,7 @@ export function standDown(run: RunState, config: RunConfig = RUN_CONFIG): RunRes
   const ex = run.excursion;
   if (!ex || ex.expedition) return fail({ kind: 'busy' });
   const rng = Rng.fromState(run.rngState);
-  let next = note({ ...run, excursion: null }, `You let the ring to ${ex.world.name} close.`);
+  let next = note({ ...run, excursion: null }, `You let the ring to ${isIdentified(run, ex.leadId) ? ex.world.name : 'the unidentified world'} close.`);
   const topped = ensureOpenLead(next, rng, config);
   next = { ...topped.run, rngState: rng.getState() };
   if (topped.message) next = note(next, topped.message);
@@ -440,7 +460,8 @@ export function launch(run: RunState, config: RunConfig = RUN_CONFIG): RunResult
   const team = livingTeam(run);
   if (team.length === 0) return fail({ kind: 'no-team' });
   const expedition = startExpedition(ex.world, team, run.power, config.expedition);
-  return { ok: true, run: { ...run, excursion: { ...ex, expedition } } };
+  // Stepping through names the world for good.
+  return { ok: true, run: identify({ ...run, excursion: { ...ex, expedition } }, ex.leadId) };
 }
 
 /** Store expedition progress (the run's power is the expedition's power). */

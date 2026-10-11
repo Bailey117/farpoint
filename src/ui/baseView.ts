@@ -11,6 +11,7 @@ import { HAZARD_LABEL } from '../game/world';
 import { h } from './dom';
 import { ITEM_LABEL, memberCard } from './expeditionView';
 import { glyphSvg } from './glyphArt';
+import { addressGlyphs } from './decrypt';
 import { confirmButton } from './widgets';
 
 export interface BaseActions {
@@ -119,7 +120,9 @@ export function renderBase(root: HTMLElement, run: RunState, actions: BaseAction
             h(
               'div',
               { class: 'world-row' },
-              h('div', {}, h('strong', {}, w.name), h('div', { class: 'muted small-text' }, `${BIOME_INFO[w.biome].name} · hazard ${w.hazard} (${HAZARD_LABEL[w.hazard] ?? '?'}) · ${w.visits} visit${w.visits === 1 ? '' : 's'}`)),
+              w.identified === false
+                ? h('div', {}, h('strong', { class: 'unidentified-name', 'aria-label': 'Unidentified world' }, addressGlyphs(w.address)), h('div', { class: 'muted small-text' }, 'Unidentified world · probe it or go through to learn more'))
+                : h('div', {}, h('strong', {}, w.name), h('div', { class: 'muted small-text' }, `${BIOME_INFO[w.biome].name} · hazard ${w.hazard} (${HAZARD_LABEL[w.hazard] ?? '?'}) · ${w.visits} visit${w.visits === 1 ? '' : 's'}`)),
               h('button', { class: 'small', disabled: !canDialNow || team.length === 0, onclick: () => actions.dialKnown(w.leadId) }, run.freeDials > 0 ? 'Dial (free)' : `Dial (${cfg.dialCost} power)`),
             );
           const shown = ordered.slice(0, KNOWN_SHOWN);

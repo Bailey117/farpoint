@@ -19,6 +19,7 @@ import {
   finalUnlocked,
   finishExcursion,
   healMember,
+  isIdentified,
   launch,
   livingTeam,
   newRun,
@@ -173,6 +174,28 @@ describe('decoding leads', () => {
 
 describe('excursions', () => {
   const ready = (seed: string) => solve(newRun(seed), openLeads(newRun(seed))[0]!.id);
+
+  it('a newly opened world stays unidentified until probed or entered', () => {
+    const opened = ready('ident');
+    const leadId = opened.excursion!.leadId;
+    expect(isIdentified(opened, leadId)).toBe(false);
+    expect(opened.journal[0]).not.toContain(opened.excursion!.world.name);
+    const probed = ok(probe(opened)).run;
+    expect(isIdentified(probed, leadId)).toBe(true);
+    expect(probed.journal[0]).toContain(opened.excursion!.world.name);
+    // Launching without a probe also identifies it.
+    expect(isIdentified(ok(launch(opened)).run, leadId)).toBe(true);
+    // Standing down unprobed keeps the name secret.
+    const closed = ok(standDown(opened)).run;
+    expect(isIdentified(closed, leadId)).toBe(false);
+    expect(closed.journal.join(' ')).not.toContain(opened.excursion!.world.name);
+  });
+
+  it('old saves without the identified flag count as identified', () => {
+    const run = ready('legacy');
+    const legacy = { ...run, worlds: run.worlds.map(({ identified: _drop, ...w }) => w) };
+    expect(isIdentified(legacy, run.excursion!.leadId)).toBe(true);
+  });
 
   it('standing down closes the ring without a trip', () => {
     const r = ok(standDown(ready('sd'))).run;

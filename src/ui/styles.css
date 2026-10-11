@@ -278,3 +278,22 @@ button.danger { border-color: var(--danger); color: var(--danger); }
 .more-worlds summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; padding: 6px 0; }
 
 button.armed { border-color: var(--danger); color: var(--danger); }
+
+/* Unidentified worlds and the decrypt effect */
+.name-glyphs { display: inline-flex; gap: 4px; vertical-align: middle; }
+.name-glyph { width: 1.15em; height: 1.15em; color: var(--accent-2); }
+.unidentified-name .name-glyph { width: 20px; height: 20px; }
+.world-name { min-height: 1.5em; font-variant-numeric: tabular-nums; }
+.world-name.decrypting .name-glyphs { animation: glyph-flicker 500ms steps(6) both; }
+.scramble { display: inline-block; min-width: 0.6em; text-align: center; color: var(--muted); font-family: ui-monospace, monospace; }
+.scramble.locked { color: var(--accent-2); font-family: inherit; min-width: 0; animation: lock-in 260ms ease-out; }
+.reveal-after { visibility: hidden; }
+.reveal-after.revealed-now { visibility: visible; animation: fade-up 420ms ease-out; }
+@keyframes glyph-flicker {
+  0% { opacity: 1; } 20% { opacity: 0.3; } 40% { opacity: 1; } 60% { opacity: 0.2; } 80% { opacity: 0.9; } 100% { opacity: 0.1; }
+}
+@keyframes lock-in { from { text-shadow: 0 0 12px var(--accent); } to { text-shadow: none; } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .world-name.decrypting .name-glyphs, .scramble.locked, .reveal-after.revealed-now { animation: none; }
+}

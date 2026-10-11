@@ -9,6 +9,7 @@ import { BIOME_INFO } from '../data/biomes';
 import { ENCOUNTERS } from '../data/encounters';
 import type { AidKind } from '../game/decode';
 import type { Choice } from '../game/encounter';
+import type { GlyphId } from '../game/glyphs';
 import {
   type AppliedEffect,
   type ExpeditionError,
@@ -26,6 +27,7 @@ import {
 } from '../game/expedition';
 import { type Member, ROLE_LABEL, STATS, STAT_LABEL, WOUND_LABEL, effectiveStat, isAlive } from '../game/team';
 import { HAZARD_LABEL, type ProbeReport, type World } from '../game/world';
+import { addressGlyphs, decryptInto } from './decrypt';
 import { h } from './dom';
 
 export const ITEM_LABEL: Record<AidKind, string> = { reveal: 'Resonance key', eliminate: 'Null filter', freeDial: 'Capacitor' };
@@ -39,6 +41,10 @@ export interface ExpeditionSnapshot {
   /** Base team (used in briefing). */
   team: Member[];
   expedition: ExpeditionState | null;
+  /** The world's address, shown in place of its name until it is identified. */
+  address: readonly GlyphId[];
+  /** Whether the world's name and biome are known (probed or visited). */
+  identified: boolean;
 }
 
 export interface ExpeditionViewOptions {
@@ -57,6 +63,9 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
   let message = '';
   /** Set once the app has moved to another screen (e.g. after standing down). */
   let disposed = false;
+  /** Identification already shown, so the decrypt plays only once, at the moment of probing. */
+  let shownIdentified = opts.get().identified;
+  let cancelDecrypt: (() => void) | null = null;
 
   const snap = () => opts.get();
   const nameOf = (id: string) => (snap().expedition?.team ?? snap().team).find((m) => m.id === id)?.name ?? id;
@@ -83,6 +92,9 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
 
   function render() {
     if (disposed) return;
+    // A redraw mid-animation jumps straight to the revealed name.
+    cancelDecrypt?.();
+    cancelDecrypt = null;
     const s = snap();
     const exp = s.expedition;
     const story = h('div', { class: 'exp-main' });
@@ -91,19 +103,42 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
     else if (exp.status === 'encounter') story.append(encounterPanel(exp));
     else story.append(...(lastResolution ? [resolutionPanel(lastResolution, false)] : []), endPanel(exp));
     if (exp && exp.log.length) story.append(logPanel(exp));
-    root.replaceChildren(h('main', { class: 'expedition' }, h('div', { class: 'exp-side' }, worldPanel(s), teamPanel(s)), story));
+    const world = worldPanel(s);
+    root.replaceChildren(h('main', { class: 'expedition' }, h('div', { class: 'exp-side' }, world, teamPanel(s)), story));
+    if (s.identified && !shownIdentified) {
+      shownIdentified = true;
+      const nameEl = world.querySelector<HTMLElement>('.world-name')!;
+      const hiddenParts = Array.from(world.querySelectorAll<HTMLElement>('.reveal-after'));
+      nameEl.replaceChildren(addressGlyphs(s.address));
+      cancelDecrypt = decryptInto(nameEl, s.world.name, s.world.seed, () => {
+        for (const el of hiddenParts) el.classList.add('revealed-now');
+        cancelDecrypt = null;
+      });
+    }
   }
 
   function worldPanel(s: ExpeditionSnapshot): HTMLElement {
     const biome = BIOME_INFO[s.world.biome];
     const hazardKnown = s.probe !== null || s.expedition !== null;
+    // About to decrypt: biome details wait until the name has resolved.
+    const animating = s.identified && !shownIdentified;
+    if (!s.identified) {
+      return h(
+        'section',
+        { class: 'panel world-panel' },
+        h('h2', {}, 'World'),
+        h('div', { class: 'world-name unidentified', 'aria-label': 'Unidentified world' }, addressGlyphs(s.address)),
+        h('div', { class: 'world-meta' }, h('strong', {}, 'Unidentified world'), ' · Hazard unknown'),
+        h('p', { class: 'muted' }, 'All you have is its address. Probe the far side to learn what is there.'),
+      );
+    }
     return h(
       'section',
       { class: 'panel world-panel' },
       h('h2', {}, 'World'),
       h('div', { class: 'world-name' }, s.world.name),
-      h('div', { class: 'world-meta' }, h('strong', {}, biome.name), ' · ', hazardKnown ? `Hazard ${s.world.hazard} (${HAZARD_LABEL[s.world.hazard]})` : 'Hazard unknown'),
-      h('p', { class: 'muted' }, biome.description),
+      h('div', { class: `world-meta ${animating ? 'reveal-after' : ''}` }, h('strong', {}, biome.name), ' · ', hazardKnown ? `Hazard ${s.world.hazard} (${HAZARD_LABEL[s.world.hazard]})` : 'Hazard unknown'),
+      h('p', { class: `muted ${animating ? 'reveal-after' : ''}` }, biome.description),
       s.expedition ? h('div', { class: 'progress' }, progressText(s.expedition)) : null,
     );
   }
@@ -276,6 +311,7 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
   return {
     dispose() {
       disposed = true;
+      cancelDecrypt = null;
     },
   };
 }

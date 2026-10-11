@@ -16,6 +16,7 @@ import {
   dialKnownWorld,
   finishExcursion,
   healMember,
+  isIdentified,
   launch,
   newRun,
   probe,
@@ -127,14 +128,24 @@ export function startApp(root: HTMLElement): void {
       }
       case 'dial': {
         const w = run!.worlds.find((x) => x.leadId === next.leadId)!;
-        mounted = mountDialView(screenEl, `Dialling ${w.name}`, w.address, () => show({ kind: 'excursion' }));
+        mounted = mountDialView(screenEl, w.identified === false ? 'Dialling an unidentified world' : `Dialling ${w.name}`, w.address, () => show({ kind: 'excursion' }));
         return;
       }
       case 'excursion': {
         mounted = mountExpeditionView(screenEl, {
           get: () => {
             const ex = run!.excursion!;
-            return { world: ex.world, probe: ex.probe, probeCost: RUN_CONFIG.probeCost, power: run!.power, team: run!.team, expedition: ex.expedition };
+            const lead = run!.leads.find((l) => l.id === ex.leadId);
+            return {
+              world: ex.world,
+              probe: ex.probe,
+              probeCost: RUN_CONFIG.probeCost,
+              power: run!.power,
+              team: run!.team,
+              expedition: ex.expedition,
+              address: lead?.address ?? [],
+              identified: isIdentified(run!, ex.leadId),
+            };
           },
           onProbe: () => {
             const r = probe(run!);
