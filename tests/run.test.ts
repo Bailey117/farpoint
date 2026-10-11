@@ -167,7 +167,7 @@ describe('decoding leads', () => {
     expect(finalUnlocked(unlocked)).toBe(true);
     const won = solve(unlocked, fin.id);
     expect(won.excursion!.world.biome).toBe('final');
-    expect(won.excursion!.world.hazard).toBe(5);
+    expect(won.excursion!.world.hazard).toBe(6);
   });
 });
 
@@ -177,6 +177,16 @@ describe('excursions', () => {
   it('standing down closes the ring without a trip', () => {
     const r = ok(standDown(ready('sd'))).run;
     expect(r.excursion).toBeNull();
+  });
+
+  it('standing down after solving the last lead still leaves something to decode', () => {
+    let run = newRun('sd-last');
+    for (const l of openLeads(run).slice(1)) run = { ...run, leads: run.leads.map((x) => (x.id === l.id ? { ...x, solved: true } : x)) };
+    run = solve(run, openLeads(run)[0]!.id);
+    expect(openLeads(run)).toHaveLength(0);
+    const after = ok(standDown(run)).run;
+    expect(openLeads(after)).toHaveLength(1);
+    expect(after.journal[0]).toContain('new partial address');
   });
 
   it('launch sends the living team with the run power', () => {
@@ -248,7 +258,7 @@ describe('excursions', () => {
     const fin = finalLead(run)!;
     const rng = new Rng(2);
     const facts: Fact[] = [];
-    for (let i = 0; i < 4; i++) facts.push(extraFact(rng, fin.address, facts, 'minor')!);
+    for (let i = 0; i < RUN_CONFIG.finalUnlockFacts; i++) facts.push(extraFact(rng, fin.address, facts, 'minor')!);
     const opened = solve({ ...run, leads: run.leads.map((l) => (l.final ? { ...l, facts } : l)) }, fin.id);
     const launched = ok(launch(opened)).run;
     const evac = ok(finishExcursion(playThrough(launched, 'evac'))).run;

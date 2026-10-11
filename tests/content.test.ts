@@ -8,6 +8,10 @@ describe('encounter content', () => {
     expect(validateEncounters(ENCOUNTERS)).toEqual([]);
   });
 
+  it('every biome has at least 8 encounters of its own', () => {
+    for (const b of BIOMES) expect(ENCOUNTERS.filter((e) => e.biome === b).length).toBeGreaterThanOrEqual(8);
+  });
+
   it('every biome can fill the longest chain', () => {
     for (const b of BIOMES) expect(poolFor(b, ENCOUNTERS).length).toBeGreaterThanOrEqual(MAX_ENCOUNTERS);
   });

@@ -249,3 +249,7 @@ button.danger { border-color: var(--danger); color: var(--danger); }
 .fallen { margin-top: 12px; color: var(--muted); font-size: 0.88rem; }
 .fallen summary { cursor: pointer; }
 .dial-screen { max-width: 620px; margin: 0 auto; padding: 16px; }
+
+.slot.probing { border-style: dashed; border-color: var(--accent); }
+.tip { font-size: 0.82rem; margin-top: -6px; }
+.more-worlds summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 6px 0; }

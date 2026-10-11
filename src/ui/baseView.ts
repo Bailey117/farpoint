@@ -23,6 +23,9 @@ export interface BaseActions {
   abandon(): void;
 }
 
+/** Known worlds listed before the rest are folded away. */
+const KNOWN_SHOWN = 5;
+
 const ITEM_TEXT: Record<AidKind, string> = {
   reveal: 'Reveals one unknown slot of an address',
   eliminate: 'Rules out one glyph from an address',
@@ -108,18 +111,25 @@ export function renderBase(root: HTMLElement, run: RunState, actions: BaseAction
     h('h2', {}, 'Known worlds'),
     known.length === 0
       ? h('p', { class: 'muted' }, 'None yet. Decode an address to open a world.')
-      : h(
-          'div',
-          { class: 'worlds' },
-          known.map((w) =>
+      : (() => {
+          // Newest first; the Farpoint (once open) always stays visible.
+          const ordered = [...known].reverse().sort((a, b) => (b.biome === 'final' ? 1 : 0) - (a.biome === 'final' ? 1 : 0));
+          const row = (w: (typeof known)[number]) =>
             h(
               'div',
               { class: 'world-row' },
-              h('div', {}, h('strong', {}, w.name), h('div', { class: 'muted small-text' }, `${BIOME_INFO[w.biome].name} · hazard ${w.hazard} (${HAZARD_LABEL[w.hazard]}) · ${w.visits} visit${w.visits === 1 ? '' : 's'}`)),
+              h('div', {}, h('strong', {}, w.name), h('div', { class: 'muted small-text' }, `${BIOME_INFO[w.biome].name} · hazard ${w.hazard} (${HAZARD_LABEL[w.hazard] ?? '?'}) · ${w.visits} visit${w.visits === 1 ? '' : 's'}`)),
               h('button', { class: 'small', disabled: !canDialNow || team.length === 0, onclick: () => actions.dialKnown(w.leadId) }, run.freeDials > 0 ? 'Dial (free)' : `Dial (${cfg.dialCost} power)`),
-            ),
-          ),
-        ),
+            );
+          const shown = ordered.slice(0, KNOWN_SHOWN);
+          const rest = ordered.slice(KNOWN_SHOWN);
+          return h(
+            'div',
+            { class: 'worlds' },
+            shown.map(row),
+            rest.length ? h('details', { class: 'more-worlds' }, h('summary', {}, `Show ${rest.length} more`), rest.map(row)) : null,
+          );
+        })(),
   );
 
   const facilities = h(

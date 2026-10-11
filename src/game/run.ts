@@ -39,14 +39,19 @@ import { Rng, deriveSeed } from './rng';
 import { type Member, ROLES, changeWounds, generateMember, generateTeam, isAlive } from './team';
 import { type ProbeReport, type World, generateFinalWorld, generateWorld, probeWorld } from './world';
 
+/**
+ * Balance values. Tuned with the playtest bots in sim/ (`npm run balance`):
+ * a careful bot wins roughly 1 run in 3 over ~15 expeditions; a careless
+ * one rarely survives past the first few.
+ */
 export const RUN_CONFIG = {
   startPower: 120,
   startSalvage: 15,
   startItems: { reveal: 1, eliminate: 1, freeDial: 1 } as AidCharges,
-  dialCost: 10,
+  dialCost: 8,
   probeCost: 5,
   /** Base reactor output added every time a team comes home (or is lost). */
-  returnTrickle: 15,
+  returnTrickle: 25,
   /** Generator: this much salvage buys this much power. */
   generator: { salvage: 10, power: 15 },
   /** Infirmary: salvage per wound step healed. */
@@ -61,9 +66,9 @@ export const RUN_CONFIG = {
   startLeadFragments: { knownSlots: 2, clues: 3 },
   newLeadFragments: { knownSlots: 1, clues: 2 },
   /** Chance a fragment found on a hazard >= minHazard world belongs to the final address. */
-  finalFragment: { chance: 0.4, minHazard: 3 },
+  finalFragment: { chance: 0.3, minHazard: 3 },
   /** Clues needed on the final address before it can be decoded. */
-  finalUnlockFacts: 4,
+  finalUnlockFacts: 6,
   /** Chance a fragment opens a new lead rather than adding to an existing one. */
   newLeadChance: 0.35,
   expedition: DEFAULT_EXPEDITION_CONFIG as ExpeditionConfig,
@@ -410,11 +415,23 @@ export function probe(run: RunState, defs: readonly EncounterDef[] = ENCOUNTERS,
   return { ok: true, run: { ...run, power: run.power - config.probeCost, excursion: { ...ex, probe: probeWorld(ex.world, defs) } } };
 }
 
+/** If no ordinary lead is open, the archive yields a new one. */
+function ensureOpenLead(run: RunState, rng: Rng, config: RunConfig): { run: RunState; message: string | null } {
+  if (openLeads(run).length > 0 || run.status !== 'active') return { run, message: null };
+  const lead = newLead(run.leads, rng, false, config.newLeadFragments);
+  return { run: { ...run, leads: [...run.leads, lead] }, message: `The archive yields a new partial address: lead ${lead.id}.` };
+}
+
 /** Close the ring without going through (back to base). */
-export function standDown(run: RunState): RunResult {
+export function standDown(run: RunState, config: RunConfig = RUN_CONFIG): RunResult {
   const ex = run.excursion;
   if (!ex || ex.expedition) return fail({ kind: 'busy' });
-  return { ok: true, run: settle(note({ ...run, excursion: null }, `You let the ring to ${ex.world.name} close.`), RUN_CONFIG) };
+  const rng = Rng.fromState(run.rngState);
+  let next = note({ ...run, excursion: null }, `You let the ring to ${ex.world.name} close.`);
+  const topped = ensureOpenLead(next, rng, config);
+  next = { ...topped.run, rngState: rng.getState() };
+  if (topped.message) next = note(next, topped.message);
+  return { ok: true, run: settle(next, config) };
 }
 
 export function launch(run: RunState, config: RunConfig = RUN_CONFIG): RunResult {
@@ -511,11 +528,9 @@ export function finishExcursion(run: RunState, config: RunConfig = RUN_CONFIG): 
     lines.push(`A new volunteer, ${r.name}, arrives at the base.`);
   }
   // Always leave something to decode.
-  if (openLeads(next).length === 0 && next.status === 'active') {
-    const lead = newLead(next.leads, rng, false, config.newLeadFragments);
-    next = { ...next, leads: [...next.leads, lead] };
-    lines.push(`The archive yields a new partial address: lead ${lead.id}.`);
-  }
+  const topped = ensureOpenLead(next, rng, config);
+  if (topped.message) lines.push(topped.message);
+  next = topped.run;
   next.rngState = rng.getState();
   for (const l of lines.reverse()) next = note(next, l);
   return { ok: true, run: settle(next, config) };

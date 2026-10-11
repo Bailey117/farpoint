@@ -68,11 +68,14 @@ export function generateWorld(seed: Seed, defs: readonly EncounterDef[], opts: W
   return { seed: typeof seed === 'number' ? seed >>> 0 : deriveSeed(seed, 'id'), name, biome, hazard, encounters };
 }
 
-/** The final world: hazard 5, its whole chain drawn from the 'final' pool in order. */
+/** Hazard of the final world: one step beyond the ordinary 1-5 scale. */
+export const FINAL_HAZARD = 6;
+
+/** The final world: its whole chain drawn from the 'final' pool in order. */
 export function generateFinalWorld(seed: Seed, defs: readonly EncounterDef[]): World {
   const encounters = defs.filter((d) => d.biome === 'final').map((d) => d.id);
   if (encounters.length < MIN_ENCOUNTERS) throw new Error('Not enough final encounters');
-  return { seed: deriveSeed(seed, 'final-world'), name: 'Farpoint', biome: 'final', hazard: 5, encounters };
+  return { seed: deriveSeed(seed, 'final-world'), name: 'Farpoint', biome: 'final', hazard: FINAL_HAZARD, encounters };
 }
 
 export interface ProbeReport {
@@ -88,4 +91,4 @@ export function probeWorld(world: World, defs: readonly EncounterDef[]): ProbeRe
   return { hazard: world.hazard, hint: def?.probeHint ?? 'Telemetry is inconclusive.' };
 }
 
-export const HAZARD_LABEL = ['', 'Benign', 'Guarded', 'Hostile', 'Severe', 'Lethal'] as const;
+export const HAZARD_LABEL = ['', 'Benign', 'Guarded', 'Hostile', 'Severe', 'Lethal', 'Beyond measure'] as const;

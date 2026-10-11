@@ -217,17 +217,22 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
                 g ? glyphSvg(g) : h('span', { class: 'slot-empty' }, '·'),
               );
             }
-            const warn =
-              g !== null &&
-              (k.glyphStatus[g] === 'absent' || k.slotExcluded[i]?.has(g) || (k.slotGlyph[i] !== null && k.slotGlyph[i] !== g));
-            const cls = ['slot', i === cursor ? 'cursor' : '', g && k.slotGlyph[i] === g ? 'known' : '', warn ? 'warn' : '']
+            // Warn only about wasted tests: a glyph known to be absent, ruled out
+            // of this slot, or already known to sit in another slot. Testing a
+            // new glyph in a solved slot is a good move, so it is not flagged.
+            const knownAt = g === null ? -1 : k.slotGlyph.indexOf(g);
+            const warn = g !== null && (k.glyphStatus[g] === 'absent' || k.slotExcluded[i]!.has(g) || (knownAt !== -1 && knownAt !== i));
+            const probing = g !== null && !warn && k.slotGlyph[i] !== null && k.slotGlyph[i] !== g;
+            const cls = ['slot', i === cursor ? 'cursor' : '', g && k.slotGlyph[i] === g ? 'known' : '', warn ? 'warn' : '', probing ? 'probing' : '']
               .filter(Boolean)
               .join(' ');
             return h(
               'button',
               {
                 class: cls,
-                title: g ? `Slot ${i + 1}: ${glyphName(g)}${warn ? ' (contradicts what you know)' : ''} — click to clear` : `Slot ${i + 1}: empty`,
+                title: g
+                  ? `Slot ${i + 1}: ${glyphName(g)}${warn ? ' (wasted: you already know this)' : probing ? ' (testing a new glyph in a solved slot)' : ''} — click to clear`
+                  : `Slot ${i + 1}: empty`,
                 onclick: () => clearSlot(i),
               },
               h('span', { class: 'slot-num' }, String(i + 1)),
@@ -372,6 +377,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
             { class: 'panel' },
             h('h2', {}, 'Glyphs'),
             h('p', { class: 'muted' }, 'Pick glyphs to fill the highlighted slot. Click a slot to clear it.'),
+            h('p', { class: 'muted tip' }, 'Tip: a slot you have already solved can hold an untested glyph instead. You learn more from each dial.'),
             palette,
             h('h2', {}, 'Puzzle aids'),
             aids,

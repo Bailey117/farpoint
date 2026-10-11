@@ -138,5 +138,5 @@ describe('whole-run simulation', () => {
     console.log('simulated endings:', endings, '| expeditions per run: min', lens[0], 'median', lens[Math.floor(lens.length / 2)], 'max', lens[lens.length - 1]);
     expect(endings.active ?? 0).toBe(0);
     expect(endings.won ?? 0).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });

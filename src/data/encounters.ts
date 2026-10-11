@@ -518,6 +518,509 @@ export const ENCOUNTERS: readonly EncounterDef[] = [
   },
 
   // ---------------------------------------------------------------------
+  // Glass Barrens (continued)
+  // ---------------------------------------------------------------------
+  {
+    id: 'glass-sunstorm',
+    biome: 'glass',
+    title: 'Sunstorm',
+    text: 'The sun swells and whitens. Every pane of glass on the plain becomes a mirror, and the air above the dunes begins to shimmer and hiss.',
+    probeHint: 'Stellar activity is high. Surface temperatures spike without warning.',
+    choices: [
+      {
+        id: 'dig',
+        label: 'Dig in under the sand',
+        check: { stat: 'grit', difficulty: 3, favoredRole: 'soldier' },
+        success: { text: '{actor} digs a trench deep enough to wait it out, and strikes something buried: an old supply crate.', effects: [{ kind: 'salvage', amount: [4, 8] }] },
+        failure: { text: 'The trench is too shallow. {target} takes the worst of the heat.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+      {
+        id: 'rig',
+        label: 'Rig the glass into a collector',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'scientist' },
+        success: { text: '{actor} angles a dozen panes onto the field cells. The storm becomes a power source.', effects: [{ kind: 'power', amount: [8, 12] }] },
+        failure: { text: 'The collector focuses the light in the wrong place.', effects: [{ kind: 'wound', target: 'all', amount: 1, chance: 0.4 }] },
+      },
+      {
+        id: 'shelter',
+        label: 'Shelter by the ring and run the coolers',
+        powerCost: 6,
+        success: { text: 'You sit it out in the ring\'s shadow while the coolers drain the cells.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'glass-caravan',
+    biome: 'glass',
+    title: 'The Glass Caravan',
+    text: 'A line of sledges crosses the dunes, pulled by long-legged animals and loaded with crystal. The drivers have seen you and are waiting to see what you do.',
+    probeHint: 'A moving group with pack animals crosses the dunes regularly.',
+    choices: [
+      {
+        id: 'trade',
+        label: 'Trade with them',
+        check: { stat: 'rapport', difficulty: 3, favoredRole: 'linguist' },
+        success: { text: '{actor} haggles in gestures and drawings. You come away with a tuning crystal and some scrap.', effects: [{ kind: 'item', item: 'reveal' }, { kind: 'salvage', amount: [2, 4] }] },
+        failure: { text: 'Something {actor} offers is an insult. A warning shot cracks the glass near your feet.', effects: [{ kind: 'wound', target: 'actor', amount: 1, chance: 0.5 }] },
+      },
+      {
+        id: 'escort',
+        label: 'Offer to guard them through the dunes',
+        check: { stat: 'grit', difficulty: 3, favoredRole: 'soldier' },
+        success: { text: 'Nothing attacks the caravan while {actor} walks point. The drivers pay well.', effects: [{ kind: 'salvage', amount: [8, 12] }] },
+        failure: { text: 'Raiders hit the caravan at dusk. {target} is hurt holding them off.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+    ],
+  },
+  {
+    id: 'glass-obelisk',
+    biome: 'glass',
+    title: 'The Humming Obelisk',
+    text: 'A black obelisk stands alone on the glass, humming. Shapes move across its surface. Some of them are ring glyphs.',
+    probeHint: 'A tall object emits a steady low-frequency signal.',
+    choices: [
+      {
+        id: 'read',
+        label: 'Read the moving glyphs',
+        check: { stat: 'rapport', difficulty: 4, favoredRole: 'linguist' },
+        success: { text: '{actor} catches the sequence as it cycles: one glyph of an address, and the slot it sits in.', effects: [{ kind: 'fragment', strength: 'major' }] },
+        failure: { text: '{actor} touches the surface to follow a glyph, and it burns.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'measure',
+        label: 'Measure its field',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'scientist' },
+        success: { text: '{actor} logs the field and finds it pointing, faintly, at part of an address. The cells top up from it too.', effects: [{ kind: 'fragment', strength: 'minor' }, { kind: 'power', amount: 5 }] },
+        failure: { text: 'The obelisk pulls charge out of {actor}\'s instruments.', effects: [{ kind: 'power', amount: -8 }] },
+      },
+      {
+        id: 'leave',
+        label: 'Leave it humming',
+        success: { text: 'You give it a wide berth.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'glass-sinkhole',
+    biome: 'glass',
+    title: 'Sinkhole',
+    text: 'With a sound like breaking ice, the glass cracks around you. Below is a cavern, and something down there is glinting.',
+    probeHint: 'Hollow ground beneath the surface glass in several places.',
+    choices: [
+      {
+        id: 'spread',
+        label: 'Spread out and step slowly to firm ground',
+        check: { stat: 'insight', difficulty: 2 },
+        success: { text: '{actor} reads the cracks and calls each step. Everyone reaches solid glass.', effects: [] },
+        failure: { text: 'A slab tips. {target} drops a body-length and lands badly.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+      {
+        id: 'descend',
+        label: 'Climb down to whatever is glinting',
+        check: { stat: 'grit', difficulty: 4, favoredRole: 'soldier' },
+        success: { text: '{actor} comes back up with a sack of fused-glass components and a sealed filter case.', effects: [{ kind: 'salvage', amount: [10, 16] }, { kind: 'item', item: 'eliminate' }] },
+        failure: { text: 'The cavern floor is no firmer than the ceiling. {actor} falls the rest of the way.', effects: [{ kind: 'wound', target: 'actor', amount: 2 }] },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Sunken Terraces (continued)
+  // ---------------------------------------------------------------------
+  {
+    id: 'tidal-reef-shrine',
+    biome: 'tidal',
+    title: 'The Reef Shrine',
+    text: 'Coral has grown over a small shrine in the shallows. Offerings are piled at its base: tools, coins, and things you do not recognise.',
+    probeHint: 'A small structure in shallow water, overgrown with reef.',
+    choices: [
+      {
+        id: 'take',
+        label: 'Take the offerings',
+        check: { stat: 'grit', difficulty: 2 },
+        success: { text: '{actor} wades in and fills a sack. Nobody comes to stop you.', effects: [{ kind: 'salvage', amount: [6, 10] }] },
+        failure: { text: 'The coral stings. {actor}\'s hands swell and stiffen.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'study',
+        label: 'Study the carvings',
+        check: { stat: 'rapport', difficulty: 3, favoredRole: 'linguist' },
+        success: { text: '{actor} reads a prayer for safe travel, addressed to a world by its glyphs.', effects: [{ kind: 'fragment', strength: 'minor' }] },
+        failure: { text: 'The carvings are too worn to read.', effects: [] },
+      },
+      {
+        id: 'offer',
+        label: 'Leave a charged cell as an offering',
+        powerCost: 4,
+        success: { text: 'You leave the cell at the shrine and rest a while. It is the calmest hour you have spent here.', effects: [{ kind: 'heal', target: 'all', amount: 1 }] },
+      },
+    ],
+  },
+  {
+    id: 'tidal-storm-surge',
+    biome: 'tidal',
+    title: 'Storm Surge',
+    text: 'A storm rolls in off the sea. The water climbs the terraces faster than you can, and a small boat is tied to a pillar nearby.',
+    probeHint: 'Severe storms build quickly over the sea.',
+    choices: [
+      {
+        id: 'sail',
+        label: 'Take the boat across to the next tower',
+        check: { stat: 'insight', difficulty: 3 },
+        success: { text: '{actor} reads the swell and steers you into the lee of a tower with a dry upper room, full of old charts.', effects: [{ kind: 'fragment', strength: 'minor' }, { kind: 'salvage', amount: [2, 5] }] },
+        failure: { text: 'The boat capsizes in the surf. {target} is pulled under before you drag them out.', effects: [{ kind: 'wound', target: 'random', amount: 1 }, { kind: 'power', amount: -3 }] },
+      },
+      {
+        id: 'swim',
+        label: 'Swim for the high terrace',
+        check: { stat: 'grit', difficulty: 4 },
+        success: { text: '{actor} gets a rope across and the rest follow it. You find salvage washed up on the terrace.', effects: [{ kind: 'salvage', amount: [3, 6] }] },
+        failure: { text: 'The water is stronger than any of you.', effects: [{ kind: 'wound', target: 'all', amount: 1, chance: 0.5 }] },
+      },
+      {
+        id: 'wait',
+        label: 'Seal yourselves in a tower and wait',
+        powerCost: 8,
+        success: { text: 'The pumps keep the room dry until the storm passes.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'tidal-net-hunters',
+    biome: 'tidal',
+    title: 'The Net Hunters',
+    text: 'Something in the water casts a sticky net over the steps ahead, then waits. Further along, the remains of its last catch are still tangled up.',
+    probeHint: 'Aquatic predators detected near the shoreline.',
+    choices: [
+      {
+        id: 'fight',
+        label: 'Fight it at the water\'s edge',
+        check: { stat: 'grit', difficulty: 3, favoredRole: 'soldier' },
+        success: { text: '{actor} drives it back into the deep. Its catch includes a lot of useful scrap.', effects: [{ kind: 'salvage', amount: [5, 9] }] },
+        failure: { text: 'It drags {actor} halfway into the water before letting go.', effects: [{ kind: 'wound', target: 'actor', amount: 2 }] },
+      },
+      {
+        id: 'trap',
+        label: 'Bait a trap for it',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'scientist' },
+        success: { text: '{actor}\'s trap holds. You strip its lair at leisure and find a working capacitor.', effects: [{ kind: 'salvage', amount: [6, 10] }, { kind: 'item', item: 'freeDial' }] },
+        failure: { text: 'It takes the bait and the trap, and lashes out at {target}.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+    ],
+  },
+  {
+    id: 'tidal-lighthouse',
+    biome: 'tidal',
+    title: 'The Drowned Lighthouse',
+    text: 'A tower stands in deep water, its lamp room still above the waves. Something inside it is turning, slowly.',
+    probeHint: 'A tall structure offshore emits a faint rotating light.',
+    choices: [
+      {
+        id: 'restart',
+        label: 'Restart its lamp',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'scientist' },
+        success: { text: '{actor} brings the lamp back to life, and its old reactor fills your cells.', effects: [{ kind: 'power', amount: [12, 18] }] },
+        failure: { text: 'The lamp flares while {actor} is still looking at it.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'logs',
+        label: 'Climb to the keeper\'s log room',
+        check: { stat: 'grit', difficulty: 3 },
+        success: { text: 'The last keeper logged every ring address the light was used to guide. One is legible.', effects: [{ kind: 'fragment', strength: 'major' }] },
+        failure: { text: 'A rusted rung gives way under {actor}.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'signal',
+        label: 'Signal with the light',
+        check: { stat: 'rapport', difficulty: 3, favoredRole: 'linguist' },
+        success: { text: '{actor} flashes a greeting. Lantern boats arrive with food, scrap and a healer\'s skill. {target} is patched up.', effects: [{ kind: 'salvage', amount: [3, 6] }, { kind: 'heal', target: 'random', amount: 1 }] },
+        failure: { text: 'Something answers the light, but it is not a boat.', effects: [{ kind: 'wound', target: 'random', amount: 1, chance: 0.5 }] },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Sporewood (continued)
+  // ---------------------------------------------------------------------
+  {
+    id: 'spore-sleepers',
+    biome: 'spore',
+    title: 'The Sleepers',
+    text: 'Pale cocoons hang from the stalks. Inside them, people are sleeping. They are breathing.',
+    probeHint: 'Faint life signs inside the fungal growth.',
+    choices: [
+      {
+        id: 'free',
+        label: 'Cut one free',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'medic' },
+        success: { text: '{actor} works the cocoon open carefully. The sleeper wakes, grateful and confused, and shows you where their party left its stores.', effects: [{ kind: 'salvage', amount: [6, 10] }, { kind: 'item', item: 'reveal' }] },
+        failure: { text: 'The cocoon bursts in a cloud of spores, right in {actor}\'s face.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'observe',
+        label: 'Observe from a distance',
+        check: { stat: 'insight', difficulty: 2, favoredRole: 'scientist' },
+        success: { text: 'One sleeper wears a badge stamped with glyphs. {actor} copies them down.', effects: [{ kind: 'fragment', strength: 'minor' }] },
+        failure: { text: 'You learn nothing, and the stillness gets to everyone.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'spore-glowmire',
+    biome: 'spore',
+    title: 'Glowmire',
+    text: 'A wide bog glows blue-green from below. Some of the light is steady and some of it pulses, and the ground under the pulsing patches looks soft.',
+    probeHint: 'Extensive wetland with strong bioluminescence.',
+    choices: [
+      {
+        id: 'wade',
+        label: 'Wade straight across',
+        check: { stat: 'grit', difficulty: 3 },
+        success: { text: '{actor} leads you through, waist-deep at times, and finds things the bog had swallowed.', effects: [{ kind: 'salvage', amount: [4, 8] }] },
+        failure: { text: 'The mire takes {target} to the chest before you pull them out.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+      {
+        id: 'map',
+        label: 'Map the firm ground from the light pattern',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'scientist' },
+        success: { text: '{actor} sees that the steady glow marks firm ground, and that its paths form a pattern: part of an address.', effects: [{ kind: 'fragment', strength: 'minor' }, { kind: 'salvage', amount: [2, 4] }] },
+        failure: { text: '{actor} trusts a steady patch that was only steady for a moment.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'burn',
+        label: 'Burn a dry path with the cutter',
+        powerCost: 6,
+        success: { text: 'The cutter dries a crust you can walk on. It costs you charge, but nothing else.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'spore-canopy-drop',
+    biome: 'spore',
+    title: 'Pod Fall',
+    text: 'Above you, seed pods the size of houses are tearing loose from the canopy. The first one lands with a sound you feel in your chest.',
+    probeHint: 'Heavy objects periodically fall from the canopy.',
+    choices: [
+      {
+        id: 'shelter',
+        label: 'Shelter against the thickest stalk',
+        check: { stat: 'grit', difficulty: 2 },
+        success: { text: 'You press against the stalk while pods crash down around you. {actor} keeps everyone still.', effects: [] },
+        failure: { text: 'A pod bursts nearby. Fragments hit {target}.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+      {
+        id: 'harvest',
+        label: 'Catch one as it lands and harvest it',
+        check: { stat: 'grit', difficulty: 4, favoredRole: 'soldier' },
+        success: { text: '{actor} splits a fallen pod. Inside, its fibres are worth a great deal as salvage.', effects: [{ kind: 'salvage', amount: [10, 15] }] },
+        failure: { text: 'The pod rolls. {actor} doesn\'t.', effects: [{ kind: 'wound', target: 'actor', amount: 2 }] },
+      },
+    ],
+  },
+  {
+    id: 'spore-gardeners',
+    biome: 'spore',
+    title: 'The Gardeners\' Camp',
+    text: 'A camp of curved stone huts sits in a clearing. A tall machine of the same stone still walks between the beds, tending the fungus. It turns its head towards you.',
+    probeHint: 'A slow-moving artificial unit is active in a cleared area.',
+    choices: [
+      {
+        id: 'talk',
+        label: 'Speak to the gardener',
+        check: { stat: 'rapport', difficulty: 4, favoredRole: 'linguist' },
+        success: { text: '{actor} finds words it understands. It recites a ring address, the one its makers left by, and fixes one glyph for certain.', effects: [{ kind: 'fragment', strength: 'major' }] },
+        failure: { text: 'It decides you are a weed. {target} is thrown clear of the beds.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+      {
+        id: 'repair',
+        label: 'Repair its failing power core',
+        check: { stat: 'insight', difficulty: 4, favoredRole: 'scientist' },
+        success: { text: '{actor} patches the core. In thanks, or by design, it shares its charge and a spare capacitor.', effects: [{ kind: 'power', amount: 15 }, { kind: 'item', item: 'freeDial' }] },
+        failure: { text: 'The core drains your field cells as {actor} works.', effects: [{ kind: 'power', amount: -6 }] },
+      },
+      {
+        id: 'scavenge',
+        label: 'Scavenge the empty huts',
+        check: { stat: 'grit', difficulty: 2 },
+        success: { text: '{actor} turns up tools and fittings the gardeners left behind.', effects: [{ kind: 'salvage', amount: [5, 9] }] },
+        failure: { text: 'The gardener notices you in its huts. {actor} takes a blow.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Rimeveil (continued)
+  // ---------------------------------------------------------------------
+  {
+    id: 'rime-pale-hunters',
+    biome: 'rime',
+    title: 'Pale Hunters',
+    text: 'Long white shapes keep pace with you along the ridge. Sometimes four, sometimes six. They are getting closer between each count.',
+    probeHint: 'Pack predators detected across the ice.',
+    choices: [
+      {
+        id: 'hold',
+        label: 'Form up and hold them off',
+        check: { stat: 'grit', difficulty: 3, favoredRole: 'soldier' },
+        success: { text: '{actor} breaks the first rush and the pack scatters, leaving shed crystal teeth on the ice. Worth taking.', effects: [{ kind: 'salvage', amount: [4, 8] }] },
+        failure: { text: 'The pack hits from two sides. {target} is badly bitten.', effects: [{ kind: 'wound', target: 'random', amount: 2 }] },
+      },
+      {
+        id: 'read',
+        label: 'Read their movements and slip past',
+        check: { stat: 'insight', difficulty: 3 },
+        success: { text: '{actor} picks the moment they turn to circle, and you are gone.', effects: [] },
+        failure: { text: 'They were herding you. {actor} is caught at the back.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'flare',
+        label: 'Drive them off with light and noise',
+        powerCost: 7,
+        success: { text: 'Flares and a sonic charge send them running.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'rime-thaw-vault',
+    biome: 'rime',
+    title: 'The Thaw Vault',
+    text: 'In a field of ice, one square of ground is bare and steaming. At its centre is a sealed hatch, warm to the touch, with a warning carved around it.',
+    probeHint: 'A localised heat source under the ice sheet.',
+    choices: [
+      {
+        id: 'lock',
+        label: 'Open the heat-lock',
+        check: { stat: 'insight', difficulty: 4, favoredRole: 'scientist' },
+        success: { text: '{actor} vents the lock safely. Inside is a heat battery, still charged after who knows how long.', effects: [{ kind: 'power', amount: [15, 20] }, { kind: 'salvage', amount: [2, 4] }] },
+        failure: { text: 'The vent fires early. {actor} takes a blast of steam.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'pry',
+        label: 'Pry it open',
+        check: { stat: 'grit', difficulty: 3 },
+        success: { text: '{actor} forces the hatch. You strip the vault of its fittings.', effects: [{ kind: 'salvage', amount: [6, 10] }] },
+        failure: { text: 'The hatch springs back under pressure and catches {actor}.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'translate',
+        label: 'Translate the warning first',
+        check: { stat: 'rapport', difficulty: 3, favoredRole: 'linguist' },
+        success: { text: 'The warning, {actor} realises, ends with the address of the people who built the vault.', effects: [{ kind: 'fragment', strength: 'minor' }] },
+        failure: { text: 'It is a warning. That much is clear.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'rime-singing-ice',
+    biome: 'rime',
+    title: 'The Singing Ice',
+    text: 'A frozen lake lies across your path. Every step on it produces a long, falling note, and the notes echo back changed.',
+    probeHint: 'A large frozen lake with unusual acoustic properties.',
+    choices: [
+      {
+        id: 'cross',
+        label: 'Cross quickly',
+        check: { stat: 'grit', difficulty: 3 },
+        success: { text: '{actor} sets a quick, even pace. The ice sings, but it holds.', effects: [] },
+        failure: { text: 'The ice sings one note too many. {target} goes through.', effects: [{ kind: 'wound', target: 'random', amount: 2 }] },
+      },
+      {
+        id: 'listen',
+        label: 'Listen to what the echoes are saying',
+        check: { stat: 'rapport', difficulty: 3, favoredRole: 'linguist' },
+        success: { text: '{actor} hears it: the lake repeats a sequence of tones, and they map to glyphs.', effects: [{ kind: 'fragment', strength: 'minor' }] },
+        failure: { text: 'Standing still for so long is a mistake. The ice cracks.', effects: [{ kind: 'wound', target: 'random', amount: 1, chance: 0.5 }] },
+      },
+      {
+        id: 'around',
+        label: 'Go the long way round',
+        powerCost: 5,
+        success: { text: 'The detour costs a day of heater charge.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'rime-aurora',
+    biome: 'rime',
+    title: 'Aurora Storm',
+    text: 'The sky fills with moving green light. Your instruments start to scream and the field cells grow warm in their packs.',
+    probeHint: 'Intense charged-particle activity in the upper atmosphere.',
+    choices: [
+      {
+        id: 'ground',
+        label: 'Ground the cells and harvest the charge',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'scientist' },
+        success: { text: '{actor} earths the kit and turns the storm into charge.', effects: [{ kind: 'power', amount: 10 }] },
+        failure: { text: 'The cells take more than they can hold, and dump it.', effects: [{ kind: 'power', amount: -8 }] },
+      },
+      {
+        id: 'shelter',
+        label: 'Get everyone down and shielded',
+        check: { stat: 'grit', difficulty: 2 },
+        success: { text: '{actor} gets everyone flat in a snow trench until the sky calms.', effects: [] },
+        failure: { text: 'A discharge arcs across the ice and finds {target}.', effects: [{ kind: 'wound', target: 'random', amount: 1 }] },
+      },
+      {
+        id: 'push',
+        label: 'Push on and accept the drain',
+        success: { text: 'You keep walking. The storm leeches power from everything you carry.', effects: [{ kind: 'power', amount: -4 }] },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
+  // Any biome (continued)
+  // ---------------------------------------------------------------------
+  {
+    id: 'any-stranger',
+    biome: 'any',
+    title: 'A Stranger at the Ring',
+    text: 'Someone is slumped against the ring\'s base: a traveller from another world, injured and alone, clutching a dialling slate.',
+    probeHint: 'A single faint life sign near the ring.',
+    weight: 0.8,
+    choices: [
+      {
+        id: 'treat',
+        label: 'Treat their injuries',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'medic' },
+        success: { text: '{actor} stabilises them. Before they leave, they mark one glyph of an address on your slate.', effects: [{ kind: 'fragment', strength: 'major' }] },
+        failure: { text: 'Nothing {actor} tries is enough. They slip away, and the slate goes dark.', effects: [] },
+      },
+      {
+        id: 'ask',
+        label: 'Ask what they know',
+        check: { stat: 'rapport', difficulty: 3, favoredRole: 'linguist' },
+        success: { text: 'In a mix of languages, they tell {actor} part of the address they were trying to reach.', effects: [{ kind: 'fragment', strength: 'minor' }] },
+        failure: { text: 'They are too far gone to make sense.', effects: [] },
+      },
+    ],
+  },
+  {
+    id: 'any-power-node',
+    biome: 'any',
+    title: 'Dormant Relay',
+    text: 'A squat machine stands near the ring, cabled to it by a thick braid. It is cold, but the casing is intact.',
+    probeHint: 'An inactive power installation near the ring.',
+    weight: 0.8,
+    choices: [
+      {
+        id: 'tap',
+        label: 'Wake it and tap its reserve',
+        check: { stat: 'insight', difficulty: 3, favoredRole: 'scientist' },
+        success: { text: '{actor} coaxes it awake and drains its reserve into your cells.', effects: [{ kind: 'power', amount: [10, 15] }] },
+        failure: { text: 'It wakes all at once. {actor} is thrown back from the casing.', effects: [{ kind: 'wound', target: 'actor', amount: 1 }] },
+      },
+      {
+        id: 'strip',
+        label: 'Strip it for parts',
+        check: { stat: 'grit', difficulty: 2 },
+        success: { text: '{actor} pulls out cabling and components worth having.', effects: [{ kind: 'salvage', amount: [5, 8] }] },
+        failure: { text: 'Residual charge bites {actor}.', effects: [{ kind: 'wound', target: 'actor', amount: 1, chance: 0.5 }] },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------
   // The Farpoint (final world). Met in this order.
   // ---------------------------------------------------------------------
   {
@@ -544,7 +1047,7 @@ export const ENCOUNTERS: readonly EncounterDef[] = [
       {
         id: 'overload',
         label: 'Overload it with your own field cells',
-        powerCost: 15,
+        powerCost: 30,
         success: { text: 'The lattice drinks the charge, flickers and goes dark.', effects: [] },
       },
     ],
@@ -569,6 +1072,36 @@ export const ENCOUNTERS: readonly EncounterDef[] = [
         check: { stat: 'grit', difficulty: 4, favoredRole: 'soldier' },
         success: { text: '{actor} breaks a path through courtyards and gardens of stone.', effects: [] },
         failure: { text: 'The stone fights back. Something in the walls is still awake, and {target} pays for it.', effects: [{ kind: 'wound', target: 'random', amount: 2 }] },
+      },
+    ],
+  },
+  {
+    id: 'final-keepers',
+    biome: 'final',
+    title: 'The Keepers',
+    text: 'At the foot of the spire, figures of dark stone step out of the walls. They are taller than any of you, and they have been waiting a very long time. They block the stair, and they do not move aside.',
+    probeHint: 'Large artificial guardians stand at the base of the central spire.',
+    choices: [
+      {
+        id: 'prove',
+        label: 'Prove you belong: recite the address that brought you',
+        check: { stat: 'rapport', difficulty: 5, favoredRole: 'linguist' },
+        success: { text: '{actor} speaks the final address glyph by glyph. The keepers bow, and step back into the walls.', effects: [] },
+        failure: { text: 'One glyph is wrong. The keepers close in, and {target} is struck down.', effects: [{ kind: 'wound', target: 'random', amount: 2 }, { kind: 'wound', target: 'random', amount: 1, chance: 0.5 }] },
+      },
+      {
+        id: 'break',
+        label: 'Fight your way up the stair',
+        check: { stat: 'grit', difficulty: 5, favoredRole: 'soldier' },
+        success: { text: '{actor} breaks one keeper apart and the rest hesitate long enough for you to pass.', effects: [{ kind: 'salvage', amount: [6, 10] }] },
+        failure: { text: 'Stone does not tire. You get past them, but not cleanly.', effects: [{ kind: 'wound', target: 'all', amount: 1 }] },
+      },
+      {
+        id: 'disable',
+        label: 'Find the keepers\' control glyph',
+        check: { stat: 'insight', difficulty: 5, favoredRole: 'scientist' },
+        success: { text: '{actor} spots the glyph worn into every keeper\'s chest and traces it on the stair. They freeze mid-stride.', effects: [] },
+        failure: { text: 'The keepers notice what {actor} is doing.', effects: [{ kind: 'wound', target: 'actor', amount: 2 }] },
       },
     ],
   },
@@ -626,7 +1159,7 @@ export const ENCOUNTERS: readonly EncounterDef[] = [
       {
         id: 'feed',
         label: 'Feed it power until it steadies',
-        powerCost: 20,
+        powerCost: 35,
         success: { text: 'The ring takes what it needs and settles.', effects: [] },
       },
     ],
