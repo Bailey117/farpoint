@@ -198,6 +198,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
       h('h1', {}, 'Farpoint'),
       h('span', { class: 'subtitle' }, 'Address decode'),
       h('span', { class: 'seed', title: 'Puzzle seed' }, `seed ${opts.seedLabel}`),
+      h('a', { class: 'nav-link', href: `?screen=expedition&seed=${encodeURIComponent(opts.seedLabel)}` }, 'Expedition test'),
       h(
         'button',
         {

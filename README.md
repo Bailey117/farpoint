@@ -19,4 +19,12 @@ npm test
 npm run build
 ```
 
-Append `?seed=<anything>` to the URL to replay a specific puzzle.
+URL parameters (temporary test screens until the base screen exists):
+
+- `?screen=decode&seed=<anything>`: the decode puzzle and dialling ring
+- `?screen=expedition&seed=<anything>`: an expedition on a generated world
+  (`&power=N` overrides the starting power)
+
+The same seed always gives the same puzzle, world and outcomes.
+
+Content (encounters, biomes, names) lives in `src/data/` as plain data.
