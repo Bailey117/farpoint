@@ -28,6 +28,7 @@ import {
 } from '../src/game/run';
 import { deserialize, serialize } from '../src/game/save';
 import { isAlive } from '../src/game/team';
+import { worldHazard } from '../src/game/world';
 
 function check(run: RunState) {
   expect(run.power).toBeGreaterThanOrEqual(0);
@@ -127,7 +128,7 @@ describe('whole-run simulation', () => {
       if (run.status === 'active') {
         const fin = finalLead(run)!;
         const finWorld = run.worlds.find((w) => w.leadId === fin.id);
-        console.log(`sim-${i} active after ${steps} steps (${why}): final clues ${fin.facts.length} solved ${fin.solved} final visits ${finWorld?.visits ?? 0} | expeditions ${run.stats.expeditions} deaths ${run.stats.deaths} | worlds ${run.worlds.map((w) => w.hazard).join(',')} | open leads ${openLeads(run).length} | power ${run.power} salvage ${run.salvage}`);
+        console.log(`sim-${i} active after ${steps} steps (${why}): final clues ${fin.facts.length} solved ${fin.solved} final visits ${finWorld?.visits ?? 0} | expeditions ${run.stats.expeditions} deaths ${run.stats.deaths} | worlds ${run.worlds.map((w) => worldHazard(w.profile, run.setting)).join(',')} | open leads ${openLeads(run).length} | power ${run.power} salvage ${run.salvage}`);
       }
       check(run);
       const key = run.status === 'lost' ? `lost:${run.lossReason}` : run.status;

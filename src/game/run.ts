@@ -26,7 +26,7 @@ import {
   generateFragmentFacts,
 } from './address';
 import { type AidCharges, type AidKind, type Attempt, type DecodeState, deriveKnowledge, withStatus } from './decode';
-import type { BiomeId, EncounterDef } from './encounter';
+import type { EncounterDef } from './encounter';
 import {
   DEFAULT_EXPEDITION_CONFIG,
   ENDED,
@@ -37,7 +37,8 @@ import {
 import type { GlyphId } from './glyphs';
 import { Rng, deriveSeed } from './rng';
 import { type Member, ROLES, changeWounds, generateMember, generateTeam, isAlive } from './team';
-import { type ProbeReport, type World, generateFinalWorld, generateWorld, probeWorld } from './world';
+import { type Faction, type Setting, buildersText, generateSetting } from './setting';
+import { type ProbeReport, type World, type WorldProfile, finalWorldProfile, generateWorldProfile, openWorld, probeWorld } from './world';
 
 /**
  * Balance values. Tuned with the playtest bots in sim/ (`npm run balance`):
@@ -94,21 +95,17 @@ export interface Lead {
 
 export interface KnownWorld {
   leadId: string;
-  name: string;
-  biome: World['biome'];
-  hazard: number;
+  /** The world's fixed identity; its hazard is worked out from it as relations change. */
+  profile: WorldProfile;
   address: GlyphId[];
   visits: number;
-  /**
-   * Whether the world's name and biome are known: set by probing it or by
-   * going through. Saves from before this field existed count as identified.
-   */
-  identified?: boolean;
+  /** Whether the world's name and details are known: set by probing it or by going through. */
+  identified: boolean;
 }
 
 /** Is this world's name known to the player yet? */
 export function isIdentified(run: RunState, leadId: string): boolean {
-  return run.worlds.find((w) => w.leadId === leadId)?.identified !== false;
+  return run.worlds.find((w) => w.leadId === leadId)?.identified === true;
 }
 
 /** Mark a world as identified (probed or visited). */
@@ -135,9 +132,13 @@ export interface RunStats {
   fragments: number;
 }
 
+export const RUN_VERSION = 2;
+
 export interface RunState {
-  version: 1;
+  version: typeof RUN_VERSION;
   seed: string;
+  /** Who built the network and who lives in it now. Faction standings change during the run. */
+  setting: Setting;
   status: RunStatus;
   lossReason: LossReason | null;
   power: number;
@@ -174,9 +175,12 @@ function newLead(leads: readonly Lead[], rng: Rng, final: boolean, fragments: { 
 export function newRun(seed: string, config: RunConfig = RUN_CONFIG): RunState {
   const rng = new Rng(deriveSeed(seed, 'run'));
   const team = generateTeam(rng);
+  // A separate stream, so the setting never shifts the rest of the run's draws.
+  const setting = generateSetting(new Rng(deriveSeed(seed, 'setting')));
   const run: RunState = {
-    version: 1,
+    version: RUN_VERSION,
     seed,
+    setting,
     status: 'active',
     lossReason: null,
     power: config.startPower,
@@ -189,7 +193,7 @@ export function newRun(seed: string, config: RunConfig = RUN_CONFIG): RunState {
     leads: [],
     worlds: [],
     excursion: null,
-    journal: ['The ring is quiet. Your team is ready.'],
+    journal: ['The ring is quiet. Your team is ready.', buildersText(setting.builders)],
     stats: { expeditions: 0, dials: 0, deaths: 0, fragments: 0 },
     nextId: 1,
     rngState: 0,
@@ -202,7 +206,7 @@ export function newRun(seed: string, config: RunConfig = RUN_CONFIG): RunState {
 }
 
 function newRecruit(run: RunState, rng: Rng): Member {
-  const m = generateMember(rng, rng.pick(ROLES), `r${run.nextId}`);
+  const m = generateMember(rng, rng.pick(ROLES), `r${run.nextId}`, [...run.team, ...run.recruits, ...run.fallen].map((x) => x.name));
   run.nextId++;
   return m;
 }
@@ -217,6 +221,15 @@ export function livingTeam(run: RunState): Member[] {
 
 export function openLeads(run: RunState): Lead[] {
   return run.leads.filter((l) => !l.solved && !l.final);
+}
+
+/**
+ * Factions the player knows about: the major powers are in the archive from
+ * the start; others once a world they live on has been identified.
+ */
+export function knownFactions(run: RunState): Faction[] {
+  const met = new Set(run.worlds.filter((w) => w.identified).map((w) => w.profile.parts?.faction?.id));
+  return run.setting.factions.filter((f) => f.tier === 'major' || met.has(f.id));
 }
 
 export function finalLead(run: RunState): Lead | undefined {
@@ -380,12 +393,16 @@ export function applyDecode(run: RunState, leadId: string, ds: DecodeState, defs
     stats: { ...run.stats, dials: run.stats.dials + Math.max(0, newDials) },
   };
   if (updated.solved && !lead.solved) {
-    const world = lead.final ? generateFinalWorld(lead.worldSeed, defs) : generateWorld(lead.worldSeed, defs);
-    next = note({ ...next, excursion: { leadId, world, probe: null, expedition: null } }, lead.final ? 'The final address locks. The ring opens on the Farpoint.' : 'Address resolved: the ring opens on an unidentified world.');
-    if (!next.worlds.some((w) => w.leadId === leadId)) {
+    let known = next.worlds.find((w) => w.leadId === leadId);
+    if (!known) {
+      const taken = new Set(next.worlds.map((w) => w.profile.name));
+      const profile = lead.final ? finalWorldProfile(lead.worldSeed) : generateWorldProfile(lead.worldSeed, next.setting, { taken });
       // The Farpoint is known by name from the start; other worlds must be probed or visited.
-      next.worlds = [...next.worlds, { leadId, name: world.name, biome: world.biome, hazard: world.hazard, address: lead.address, visits: 0, identified: lead.final }];
+      known = { leadId, profile, address: lead.address, visits: 0, identified: lead.final };
+      next.worlds = [...next.worlds, known];
     }
+    const world = openWorld(known.profile, next.setting, lead.worldSeed, defs);
+    next = note({ ...next, excursion: { leadId, world, probe: null, expedition: null } }, lead.final ? 'The final address locks. The ring opens on the Farpoint.' : 'Address resolved: the ring opens on an unidentified world.');
   }
   return { ok: true, run: settle(next, RUN_CONFIG) };
 }
@@ -399,10 +416,8 @@ export function dialKnownWorld(run: RunState, leadId: string, defs: readonly Enc
   if (!known || !lead) return fail({ kind: 'unknown', what: leadId });
   if (!canPayDial(run, config)) return fail({ kind: 'no-power', needed: config.dialCost, have: run.power });
   const useFree = run.freeDials > 0;
-  const seed = deriveSeed(lead.worldSeed, `visit-${known.visits}`);
-  const base = lead.final ? generateFinalWorld(lead.worldSeed, defs) : generateWorld(lead.worldSeed, defs);
-  // Same world (name, biome, hazard), new encounters for each visit.
-  const world = lead.final ? base : { ...generateWorld(seed, defs, { biome: base.biome as BiomeId, hazard: base.hazard }), name: base.name };
+  // Same world, new encounters for each visit.
+  const world = openWorld(known.profile, run.setting, deriveSeed(lead.worldSeed, `visit-${known.visits}`), defs);
   return {
     ok: true,
     run: note(
@@ -435,7 +450,7 @@ export function probe(run: RunState, defs: readonly EncounterDef[] = ENCOUNTERS,
   if (run.status !== 'active' || !ex || ex.expedition || ex.probe) return fail({ kind: 'busy' });
   if (run.power < config.probeCost) return fail({ kind: 'no-power', needed: config.probeCost, have: run.power });
   const wasKnown = isIdentified(run, ex.leadId);
-  let next: RunState = identify({ ...run, power: run.power - config.probeCost, excursion: { ...ex, probe: probeWorld(ex.world, defs) } }, ex.leadId);
+  let next: RunState = identify({ ...run, power: run.power - config.probeCost, excursion: { ...ex, probe: probeWorld(ex.world, run.setting, defs) } }, ex.leadId);
   if (!wasKnown) next = note(next, `The probe identifies the world: ${ex.world.name}.`);
   return { ok: true, run: next };
 }

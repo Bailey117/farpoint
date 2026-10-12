@@ -9,8 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "balance": "vitest run --config vitest.balance.config.ts",
-    "build:artifact": "npm run build && node scripts/build-artifact.mjs"
+    "balance": "vitest run --config vitest.balance.config.ts --silent=false",
+    "build:artifact": "npm run build && node scripts/build-artifact.mjs",
+    "sample": "vitest run --config vitest.balance.config.ts --silent=false sim/sample.test.ts"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

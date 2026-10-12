@@ -4,6 +4,7 @@ import { type Fact, extraFact, factHolds, factKey, generateAddress } from '../sr
 import { type DecodeState, dial, useAid } from '../src/game/decode';
 import { type ExpeditionState, choose, currentEncounter, emergencyDialOut, returnHome } from '../src/game/expedition';
 import { Rng } from '../src/game/rng';
+import { worldHazard } from '../src/game/world';
 import {
   RUN_CONFIG,
   type RunState,
@@ -199,12 +200,6 @@ describe('excursions', () => {
     expect(closed.journal.join(' ')).not.toContain(opened.excursion!.world.name);
   });
 
-  it('old saves without the identified flag count as identified', () => {
-    const run = ready('legacy');
-    const legacy = { ...run, worlds: run.worlds.map(({ identified: _drop, ...w }) => w) };
-    expect(isIdentified(legacy, run.excursion!.leadId)).toBe(true);
-  });
-
   it('standing down closes the ring without a trip', () => {
     const r = ok(standDown(ready('sd'))).run;
     expect(r.excursion).toBeNull();
@@ -279,9 +274,10 @@ describe('excursions', () => {
     const before = run;
     const r = ok(dialKnownWorld(run, lead.leadId)).run;
     expect(r.power).toBe(before.power - RUN_CONFIG.dialCost);
-    expect(r.excursion!.world.name).toBe(lead.name);
-    expect(r.excursion!.world.hazard).toBe(lead.hazard);
-    expect(r.excursion!.world.biome).toBe(lead.biome);
+    expect(r.excursion!.world.name).toBe(lead.profile.name);
+    expect(r.excursion!.world.parts).toEqual(lead.profile.parts);
+    expect(r.excursion!.world.hazard).toBe(worldHazard(lead.profile, run.setting));
+    expect(r.excursion!.world.biome).toBe(lead.profile.biome);
   });
 
   it('returning from the final world wins; evacuating does not', () => {
@@ -391,7 +387,9 @@ describe('save/load', () => {
     expect(loadRun(store)).toEqual({ kind: 'none' });
     store.setItem(SAVE_KEY, '{not json');
     expect(loadRun(store)).toMatchObject({ kind: 'corrupt' });
-    expect(deserialize(JSON.stringify({ ...newRun('x'), version: 2 }))).toMatchObject({ kind: 'corrupt', reason: expect.stringContaining('version') });
+    expect(deserialize(JSON.stringify({ ...newRun('x'), version: 3 }))).toMatchObject({ kind: 'corrupt', reason: expect.stringContaining('version') });
+    // Saves from before procedural worlds are recognised as an older version.
+    expect(deserialize(JSON.stringify({ ...newRun('x'), version: 1 }))).toEqual({ kind: 'corrupt', reason: 'older-version' });
     expect(checkRun({ ...newRun('x'), power: 'lots' })).toBe('bad power');
     expect(checkRun({ ...newRun('x'), leads: [{}] })).toBe('bad lead');
     clearSave(store);

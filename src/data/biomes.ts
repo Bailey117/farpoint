@@ -28,9 +28,3 @@ export const BIOME_INFO: Record<WorldBiome, BiomeInfo> = {
   },
 };
 
-/** Syllables for procedurally named worlds. */
-export const WORLD_SYLLABLES = {
-  start: ['Ka', 'Vel', 'Or', 'Thes', 'Mi', 'Dra', 'Ush', 'Ne', 'Sol', 'Ira', 'Pel', 'Zo'],
-  middle: ['ra', 'ven', 'lo', 'shi', 'tar', 'mo', 'quel', 'di', 'an', 'ru'],
-  end: ['th', 'n', 'ra', 'dor', 'is', 'el', 'ax', 'une', 'or', 'em'],
-} as const;

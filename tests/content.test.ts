@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ENCOUNTERS } from '../src/data/encounters';
 import { BIOMES, type EncounterDef, validateEncounters } from '../src/game/encounter';
-import { MAX_ENCOUNTERS, MIN_ENCOUNTERS, generateWorld, poolFor, probeWorld } from '../src/game/world';
+import { Rng } from '../src/game/rng';
+import { generateSetting } from '../src/game/setting';
+import { MAX_ENCOUNTERS, MIN_ENCOUNTERS, generateWorldProfile, openWorld, poolFor, probeWorld } from '../src/game/world';
 
 describe('encounter content', () => {
   it('passes validation', () => {
@@ -31,11 +33,14 @@ describe('encounter content', () => {
   });
 });
 
-describe('generateWorld', () => {
-  it('is reproducible and draws distinct encounters from its biome pool', () => {
+describe('worlds', () => {
+  const setting = generateSetting(new Rng('content'));
+
+  it('a visit is reproducible and draws distinct encounters from its biome pool', () => {
     for (let i = 0; i < 200; i++) {
-      const w = generateWorld(i, ENCOUNTERS);
-      expect(generateWorld(i, ENCOUNTERS)).toEqual(w);
+      const p = generateWorldProfile(i, setting);
+      const w = openWorld(p, setting, i, ENCOUNTERS);
+      expect(openWorld(generateWorldProfile(i, setting), setting, i, ENCOUNTERS)).toEqual(w);
       expect(w.encounters.length).toBeGreaterThanOrEqual(MIN_ENCOUNTERS);
       expect(w.encounters.length).toBeLessThanOrEqual(MAX_ENCOUNTERS);
       expect(new Set(w.encounters).size).toBe(w.encounters.length);
@@ -43,25 +48,25 @@ describe('generateWorld', () => {
       for (const id of w.encounters) expect(pool.has(id)).toBe(true);
       expect(w.hazard).toBeGreaterThanOrEqual(1);
       expect(w.hazard).toBeLessThanOrEqual(5);
-      expect(w.name.length).toBeGreaterThan(2);
     }
   });
 
   it('longer chains on more hazardous worlds', () => {
     const avg = (h: number) => {
       let t = 0;
-      for (let i = 0; i < 100; i++) t += generateWorld(i, ENCOUNTERS, { hazard: h }).encounters.length;
+      for (let i = 0; i < 100; i++) t += openWorld(generateWorldProfile(i, setting, { hazard: h }), setting, i, ENCOUNTERS).encounters.length;
       return t / 100;
     };
     expect(avg(5)).toBeGreaterThan(avg(1) + 1.5);
   });
 
-  it('probe reports hazard and a hint from an encounter on this world', () => {
-    const w = generateWorld('probe', ENCOUNTERS);
-    const p = probeWorld(w, ENCOUNTERS);
+  it('probe reports hazard, its causes, and a hint from an encounter on this world', () => {
+    const w = openWorld(generateWorldProfile('probe', setting, { hazard: 4 }), setting, 'probe', ENCOUNTERS);
+    const p = probeWorld(w, setting, ENCOUNTERS);
     expect(p.hazard).toBe(w.hazard);
+    expect(p.causes.length).toBeGreaterThan(0);
     const hints = w.encounters.map((id) => ENCOUNTERS.find((d) => d.id === id)!.probeHint);
     expect(hints).toContain(p.hint);
-    expect(probeWorld(w, ENCOUNTERS)).toEqual(p);
+    expect(probeWorld(w, setting, ENCOUNTERS)).toEqual(p);
   });
 });

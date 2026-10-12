@@ -42,17 +42,30 @@ const ROLE_STATS: Record<Role, Record<Stat, number>> = {
   medic: { grit: 2, insight: 3, rapport: 3 },
 };
 
-export function generateMember(rng: Rng, role: Role, id: string): Member {
+/**
+ * A new member. `taken` holds names already in the run; the new member
+ * shares neither a first nor a last name with any of them.
+ */
+export function generateMember(rng: Rng, role: Role, id: string, taken: readonly string[] = []): Member {
   const stats = { ...ROLE_STATS[role] };
   // One stat gets +1, keeping members of the same role distinct.
   const boosted = rng.pick(STATS);
   stats[boosted] = Math.min(5, stats[boosted] + 1);
-  return { id, name: `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`, role, stats, wounds: 0 };
+  const usedFirst = new Set(taken.map((n) => n.split(' ')[0]));
+  const usedLast = new Set(taken.map((n) => n.split(' ').slice(1).join(' ')));
+  const firsts = FIRST_NAMES.filter((n) => !usedFirst.has(n));
+  const lasts = LAST_NAMES.filter((n) => !usedLast.has(n));
+  // Once a pool runs dry (a very long run), repeats are allowed again.
+  const first = rng.pick(firsts.length ? firsts : FIRST_NAMES);
+  const last = rng.pick(lasts.length ? lasts : LAST_NAMES);
+  return { id, name: `${first} ${last}`, role, stats, wounds: 0 };
 }
 
-/** A starting team: one of each role. */
+/** A starting team: one of each role, all with different names. */
 export function generateTeam(rng: Rng): Member[] {
-  return ROLES.map((role, i) => generateMember(rng, role, `m${i + 1}`));
+  const team: Member[] = [];
+  for (const [i, role] of ROLES.entries()) team.push(generateMember(rng, role, `m${i + 1}`, team.map((m) => m.name)));
+  return team;
 }
 
 export function isAlive(m: Member): boolean {

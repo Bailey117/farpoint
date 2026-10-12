@@ -45,6 +45,10 @@ export interface ExpeditionSnapshot {
   address: readonly GlyphId[];
   /** Whether the world's name and biome are known (probed or visited). */
   identified: boolean;
+  /** What the team sees on arrival, sentence by sentence. */
+  description: string[];
+  /** What makes the world dangerous. */
+  causes: string[];
 }
 
 export interface ExpeditionViewOptions {
@@ -138,7 +142,8 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
       h('h2', {}, 'World'),
       h('div', { class: 'world-name' }, s.world.name),
       h('div', { class: `world-meta ${animating ? 'reveal-after' : ''}` }, h('strong', {}, biome.name), ' · ', hazardKnown ? `Hazard ${s.world.hazard} (${HAZARD_LABEL[s.world.hazard]})` : 'Hazard unknown'),
-      h('p', { class: `muted ${animating ? 'reveal-after' : ''}` }, biome.description),
+      h('div', { class: `world-desc muted ${animating ? 'reveal-after' : ''}` }, h('p', {}, s.description.join(' '))),
+      hazardKnown && s.causes.length ? h('p', { class: `hazard-causes ${animating ? 'reveal-after' : ''}` }, h('strong', {}, 'Dangers: '), s.causes.join(', '), '.') : null,
       s.expedition ? h('div', { class: 'progress' }, progressText(s.expedition)) : null,
     );
   }
@@ -174,7 +179,14 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
       h('h2', {}, 'Briefing'),
       h('p', {}, `The ring is open. Before you send the team through, you can probe the far side for ${s.probeCost} power.`),
       s.probe
-        ? h('div', { class: 'probe' }, h('strong', {}, `Probe: hazard ${s.probe.hazard} (${HAZARD_LABEL[s.probe.hazard]}).`), ' ', s.probe.hint)
+        ? h(
+            'div',
+            { class: 'probe' },
+            h('strong', {}, `Probe: hazard ${s.probe.hazard} (${HAZARD_LABEL[s.probe.hazard]})`),
+            s.probe.causes.length ? `: ${s.probe.causes.join(', ')}.` : ': no known dangers.',
+            ' ',
+            s.probe.hint,
+          )
         : h('button', { disabled: s.power < s.probeCost, onclick: () => act(opts.onProbe) }, `Probe (${s.probeCost} power)`),
       team.length === 0 ? h('p', { class: 'warn-text' }, 'Nobody is fit to go. Stand down and call up a recruit.') : null,
       h(

@@ -4,7 +4,7 @@
  * save is reported rather than crashing the game.
  */
 
-import type { RunState } from './run';
+import { RUN_VERSION, type RunState } from './run';
 
 export const SAVE_KEY = 'farpoint.save.v1';
 
@@ -29,7 +29,8 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 /** Structural check of a parsed save. Returns a reason when invalid. */
 export function checkRun(data: unknown): string | null {
   if (!isObj(data)) return 'not an object';
-  if (data.version !== 1) return `unsupported version ${String(data.version)}`;
+  if (data.version !== RUN_VERSION) return isNum(data.version) && data.version < RUN_VERSION ? 'older-version' : `unsupported version ${String(data.version)}`;
+  if (!isObj(data.setting) || !isObj(data.setting.builders) || !Array.isArray(data.setting.factions)) return 'bad setting';
   for (const k of ['power', 'salvage', 'freeDials', 'nextId', 'rngState'] as const) if (!isNum(data[k])) return `bad ${k}`;
   if (typeof data.seed !== 'string') return 'bad seed';
   if (!['active', 'won', 'lost'].includes(data.status as string)) return 'bad status';
@@ -37,6 +38,9 @@ export function checkRun(data: unknown): string | null {
   for (const k of ['team', 'recruits', 'fallen', 'leads', 'worlds', 'journal'] as const) if (!Array.isArray(data[k])) return `bad ${k}`;
   for (const m of [...(data.team as unknown[]), ...(data.recruits as unknown[])]) {
     if (!isObj(m) || typeof m.id !== 'string' || typeof m.name !== 'string' || !isObj(m.stats) || !isNum(m.wounds)) return 'bad member';
+  }
+  for (const w of data.worlds as unknown[]) {
+    if (!isObj(w) || typeof w.leadId !== 'string' || !isObj(w.profile) || typeof w.profile.name !== 'string') return 'bad world';
   }
   for (const l of data.leads as unknown[]) {
     if (!isObj(l) || typeof l.id !== 'string' || !Array.isArray(l.address) || !Array.isArray(l.facts) || !Array.isArray(l.attempts)) return 'bad lead';

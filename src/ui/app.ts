@@ -24,6 +24,7 @@ import {
   syncExpedition,
 } from '../game/run';
 import { type KeyValueStorage, clearSave, loadRun, saveRun } from '../game/save';
+import { describeWorld, hazardCauses } from '../game/world';
 import { renderBase } from './baseView';
 import { mountDecodeView } from './decodeView';
 import { isSoundOn, setSoundOn } from './dialPlayer';
@@ -74,7 +75,13 @@ export function startApp(root: HTMLElement): void {
     run = loaded.run;
     screen = defaultScreen(run);
   } else if (loaded.kind === 'corrupt') {
-    screen = { kind: 'title', problem: `Your saved run could not be loaded (${loaded.reason}).` };
+    screen = {
+      kind: 'title',
+      problem:
+        loaded.reason === 'older-version'
+          ? 'Your saved run is from an older version of Farpoint and cannot be continued. Start a new run to see the new worlds.'
+          : `Your saved run could not be loaded (${loaded.reason}).`,
+    };
   }
 
   function defaultScreen(r: RunState): Screen {
@@ -154,7 +161,7 @@ export function startApp(root: HTMLElement): void {
       }
       case 'dial': {
         const w = run!.worlds.find((x) => x.leadId === next.leadId)!;
-        mounted = mountDialView(screenEl, w.identified === false ? 'Dialling an unidentified world' : `Dialling ${w.name}`, w.address, () => show({ kind: 'excursion' }));
+        mounted = mountDialView(screenEl, !w.identified ? 'Dialling an unidentified world' : `Dialling ${w.profile.name}`, w.address, () => show({ kind: 'excursion' }));
         return;
       }
       case 'excursion': {
@@ -171,6 +178,8 @@ export function startApp(root: HTMLElement): void {
               expedition: ex.expedition,
               address: lead?.address ?? [],
               identified: isIdentified(run!, ex.leadId),
+              description: describeWorld(ex.world, run!.setting),
+              causes: hazardCauses(ex.world, run!.setting).map((c) => c.label),
             };
           },
           onProbe: () => {

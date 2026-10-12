@@ -341,3 +341,14 @@ button.armed { border-color: var(--danger); color: var(--danger); }
 .guide-head button.small { margin-top: 0; }
 .guide ul { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .danger-note { margin: -4px 0 8px; color: var(--danger); font-size: 0.9rem; }
+
+/* The network: builders and factions */
+.factions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.faction { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg-2); }
+.faction-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+.standing { margin-left: auto; font-size: 0.85rem; font-weight: 600; }
+.standing-bad { color: var(--danger); }
+.standing-neutral { color: var(--muted); }
+.standing-good { color: var(--locked); }
+.world-desc p { margin: 0 0 6px; }
+.hazard-causes { font-size: 0.9rem; }

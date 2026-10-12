@@ -6,8 +6,9 @@
 import { BIOME_INFO } from '../data/biomes';
 import type { AidKind } from '../game/decode';
 import { deriveKnowledge } from '../game/decode';
-import { type Lead, RUN_CONFIG, type RunState, finalLead, finalUnlocked, livingTeam, openLeads } from '../game/run';
-import { HAZARD_LABEL } from '../game/world';
+import { type Lead, RUN_CONFIG, type RunState, finalLead, finalUnlocked, knownFactions, livingTeam, openLeads } from '../game/run';
+import { buildersText, factionBlurb, factionName, standingLabel } from '../game/setting';
+import { HAZARD_LABEL, worldHazard } from '../game/world';
 import { h } from './dom';
 import { ITEM_LABEL, memberCard } from './expeditionView';
 import { glyphSvg } from './glyphArt';
@@ -115,14 +116,23 @@ export function renderBase(root: HTMLElement, run: RunState, actions: BaseAction
       ? h('p', { class: 'muted' }, 'None yet. Decode an address to open a world.')
       : (() => {
           // Newest first; the Farpoint (once open) always stays visible.
-          const ordered = [...known].reverse().sort((a, b) => (b.biome === 'final' ? 1 : 0) - (a.biome === 'final' ? 1 : 0));
+          const ordered = [...known].reverse().sort((a, b) => (b.profile.biome === 'final' ? 1 : 0) - (a.profile.biome === 'final' ? 1 : 0));
           const row = (w: (typeof known)[number]) =>
             h(
               'div',
               { class: 'world-row' },
-              w.identified === false
+              !w.identified
                 ? h('div', {}, h('strong', { class: 'unidentified-name', 'aria-label': 'Unidentified world' }, addressGlyphs(w.address)), h('div', { class: 'muted small-text' }, 'Unidentified world · probe it or go through to learn more'))
-                : h('div', {}, h('strong', {}, w.name), h('div', { class: 'muted small-text' }, `${BIOME_INFO[w.biome].name} · hazard ${w.hazard} (${HAZARD_LABEL[w.hazard] ?? '?'}) · ${w.visits} visit${w.visits === 1 ? '' : 's'}`)),
+                : (() => {
+                    const hz = worldHazard(w.profile, run.setting);
+                    const holder = run.setting.factions.find((f) => f.id === w.profile.parts?.faction?.id);
+                    return h(
+                      'div',
+                      {},
+                      h('strong', {}, w.profile.name),
+                      h('div', { class: 'muted small-text' }, `${BIOME_INFO[w.profile.biome].name} · hazard ${hz} (${HAZARD_LABEL[hz] ?? '?'})${holder ? ` · ${holder.name}` : ''} · ${w.visits} visit${w.visits === 1 ? '' : 's'}`),
+                    );
+                  })(),
               h('button', { class: 'small', disabled: !canDialNow || team.length === 0, onclick: () => actions.dialKnown(w.leadId) }, run.freeDials > 0 ? 'Dial (free)' : `Dial (${cfg.dialCost} power)`),
             );
           const shown = ordered.slice(0, KNOWN_SHOWN);
@@ -162,6 +172,34 @@ export function renderBase(root: HTMLElement, run: RunState, actions: BaseAction
     ),
   );
 
+  const factions = knownFactions(run);
+  const hidden = run.setting.factions.length - factions.length;
+  const network = h(
+    'section',
+    { class: 'panel network' },
+    h('h2', {}, 'The network'),
+    h('p', { class: 'muted' }, buildersText(run.setting.builders)),
+    h(
+      'div',
+      { class: 'factions' },
+      factions.map((f) =>
+        h(
+          'div',
+          { class: 'faction' },
+          h(
+            'div',
+            { class: 'faction-head' },
+            h('strong', {}, f.name),
+            h('span', { class: 'faction-tier muted small-text' }, f.tier === 'major' ? 'Major power' : 'Minor group'),
+            h('span', { class: `standing standing-${f.standing < 0 ? 'bad' : f.standing > 0 ? 'good' : 'neutral'}`, title: factionName(f) }, standingLabel(f.standing)),
+          ),
+          h('div', { class: 'muted small-text' }, factionBlurb(f, run.setting)),
+        ),
+      ),
+    ),
+    hidden > 0 ? h('p', { class: 'muted small-text' }, `Other groups live in the network too. You will learn of them when you find their worlds.`) : null,
+  );
+
   const journal = h(
     'section',
     { class: 'panel' },
@@ -181,7 +219,7 @@ export function renderBase(root: HTMLElement, run: RunState, actions: BaseAction
       { class: 'base' },
       message ? h('p', { class: 'message base-message', role: 'status' }, message) : null,
       h('div', { class: 'base-col' }, addressPanel, facilities),
-      h('div', { class: 'base-col' }, teamPanel, journal),
+      h('div', { class: 'base-col' }, teamPanel, network, journal),
     ),
   );
 }

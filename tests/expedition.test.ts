@@ -14,7 +14,8 @@ import {
   successChance,
 } from '../src/game/expedition';
 import { Rng } from '../src/game/rng';
-import { type Member, effectiveStat, generateTeam } from '../src/game/team';
+import { newRun } from '../src/game/run';
+import { type Member, effectiveStat, generateMember, generateTeam } from '../src/game/team';
 import type { World } from '../src/game/world';
 
 // --- Fixtures --------------------------------------------------------------
@@ -357,6 +358,20 @@ describe('medicTreat', () => {
     expect(medicTreat(start(50, medicDown), 's')).toMatchObject({ ok: false, error: { kind: 'no-medic' } });
     const deadTarget = TEAM.map((m) => (m.id === 's' ? { ...m, wounds: 3 as const } : m));
     expect(medicTreat(start(50, deadTarget), 's')).toMatchObject({ ok: false, error: { kind: 'nothing-to-treat' } });
+  });
+});
+
+describe('member names', () => {
+  it('a run never repeats a first or last name until the pools run out', () => {
+    for (let seed = 0; seed < 30; seed++) {
+      let run = newRun(`names-${seed}`);
+      const rng = new Rng(seed);
+      // Simulate volunteers arriving: grow the reserve well past normal size.
+      for (let i = 0; i < 12; i++) run = { ...run, recruits: [...run.recruits, generateMember(rng, 'medic', `x${i}`, [...run.team, ...run.recruits].map((m) => m.name))] };
+      const names = [...run.team, ...run.recruits].map((m) => m.name.split(' '));
+      expect(new Set(names.map((n) => n[0])).size).toBe(names.length);
+      expect(new Set(names.map((n) => n[1])).size).toBe(names.length);
+    }
   });
 });
 
