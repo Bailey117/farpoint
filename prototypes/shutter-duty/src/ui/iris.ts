@@ -1,8 +1,7 @@
 /**
  * The iris: twelve curved bronze blades that spiral shut across the ring's
- * opening. Each blade carries one glyph in its family's colour, two blades
- * per family, so the closed iris reads as a second, smaller dial. When a
- * wormhole is held behind it, light leaks along the blade seams.
+ * opening. When a wormhole is held behind it, light leaks along the blade
+ * seams, each in one of the glyph families' colours (two blades per family).
  *
  * Each blade pivots on a pin at the rim and swings out past the edge to open,
  * like a camera aperture. It is drawn into the ring's aperture layer, so it
@@ -11,7 +10,6 @@
 
 import { familyOf } from '../../../../src/game/glyphs';
 import { FAMILY_COLOR } from '../../../../src/ui/families';
-import { glyphMarkup } from '../../../../src/ui/glyphArt';
 import { RING_ORDER } from '../../../../src/ui/ringTimeline';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -71,12 +69,6 @@ export class Iris {
     const shape = `M0 0 Q${f(a.qx)} ${f(a.qy)} ${f(a.x0)} ${f(a.y0)} A${outerR} ${outerR} 0 0 1 ${f(b.x0)} ${f(b.y0)} Q${f(b.qx)} ${f(b.qy)} 0 0 Z`;
     const seam = `M${f(b.x0)} ${f(b.y0)} Q${f(b.qx)} ${f(b.qy)} 0 0`;
     this.pivot = polar(R, 0);
-    // The glyph goes midway between the two curves, near the rim.
-    const at = (c: { x0: number; y0: number; qx: number; qy: number }, t: number) => [(1 - t) * (1 - t) * c.x0 + 2 * (1 - t) * t * c.qx, (1 - t) * (1 - t) * c.y0 + 2 * (1 - t) * t * c.qy] as const;
-    const [p1x, p1y] = at(a, 0.42);
-    const [p2x, p2y] = at(b, 0.42);
-    const glyphAt = [(p1x + p2x) / 2, (p1y + p2y) / 2] as const;
-    const glyphTurn = (Math.atan2(glyphAt[0], -glyphAt[1]) * 180) / Math.PI;
 
     for (let i = 0; i < BLADES; i++) {
       const glyph = RING_ORDER[i * 2]!;
@@ -87,8 +79,6 @@ export class Iris {
       // A raised rib along the trailing curve, and the leak of light along it.
       el('path', { d: seam, fill: 'none', stroke: '#7a6649', 'stroke-width': 1.5, opacity: 0.8 }, blade);
       this.seams.push(el('path', { d: seam, fill: 'none', stroke: color, 'stroke-width': 4, opacity: 0, class: 'iris-seam', style: `color:${color}` }, blade));
-      const holder = el('g', { transform: `translate(${f(glyphAt[0])} ${f(glyphAt[1])}) rotate(${glyphTurn.toFixed(1)}) scale(0.24) translate(-50 -50)`, color, opacity: 0.9 }, blade);
-      holder.innerHTML = `<g fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">${glyphMarkup(glyph)}</g>`;
       // The pin it turns on.
       el('circle', { cx: f(this.pivot[0]), cy: f(this.pivot[1]), r: 3.2, fill: '#8d7a5c', stroke: '#0f0c09', 'stroke-width': 1 }, blade);
       this.blades.push(blade);

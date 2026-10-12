@@ -6,7 +6,7 @@
 
 import { Rng } from '../game/rng';
 
-export type Cue = 'incoming' | 'tick' | 'open' | 'close' | 'clank' | 'thud' | 'correct' | 'wrong' | 'alarm' | 'collapse';
+export type Cue = 'incoming' | 'tick' | 'open' | 'close' | 'clank' | 'thud' | 'correct' | 'wrong' | 'alarm' | 'collapse' | 'print' | 'radio' | 'lever' | 'paper' | 'click';
 
 const KEY = 'shutter-duty.sound';
 /** Noise grain also comes from the seeded RNG; nothing in the game uses Math.random. */
@@ -128,6 +128,24 @@ export function cue(name: Cue) {
       break;
     case 'wrong':
       tone(140, 0.4, 'square', 0.08);
+      break;
+    case 'print':
+      for (let i = 0; i < 9; i++) noise(0.05, 0.18, i * 0.09, 5000, 2500);
+      tone(220, 0.8, 'square', 0.015, 0, 200);
+      break;
+    case 'radio':
+      noise(0.5, 0.22, 0, 6000, 1800);
+      tone(1000, 0.08, 'sine', 0.05, 0.45);
+      break;
+    case 'lever':
+      noise(0.18, 0.4, 0, 2500, 300);
+      tone(95, 0.3, 'sine', 0.35, 0.05);
+      break;
+    case 'paper':
+      noise(0.12, 0.08, 0, 4000, 1500);
+      break;
+    case 'click':
+      tone(1800, 0.03, 'square', 0.04);
       break;
     case 'alarm':
       for (let i = 0; i < 4; i++) tone(i % 2 ? 620 : 470, 0.22, 'sawtooth', 0.09, i * 0.24);

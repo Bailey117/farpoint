@@ -37,16 +37,50 @@ export interface Bulletin {
   effect?: BulletinEffect;
 }
 
+/** The mission log entry for a team that is off-world. */
+export interface Mission {
+  teamId: string;
+  /** Rank and name, e.g. "Lt. Mara Venn". */
+  leader: string;
+  /** People who went through. */
+  size: number;
+  /** World designation, e.g. "KR-9". */
+  destination: string;
+  departed: IsoDate;
+}
+
 /** Everything on the attendant's desk for one day. */
 export interface Reference {
   day: number;
   date: IsoDate;
+  /** The rules in force today. */
+  rules: RuleId[];
   roster: Team[];
   codes: CodeEntry[];
   bulletins: Bulletin[];
+  missions: Mission[];
 }
 
-export type RuleId = 'unlisted' | 'expired' | 'not-offworld' | 'missing' | 'duress' | 'forged' | 'recalled';
+export type RuleId =
+  | 'unlisted'
+  | 'expired'
+  | 'not-offworld'
+  | 'missing'
+  | 'duress'
+  | 'forged'
+  | 'recalled'
+  | 'wrong-leader'
+  | 'wrong-headcount'
+  | 'wrong-origin';
+
+/** A voice transmission sent with the code: who is speaking and what they claim. */
+export interface Voice {
+  speaker: string;
+  headcount: number;
+  origin: string;
+  /** The words as they come over the speaker. */
+  text: string;
+}
 
 /** What an arrival was generated to be: let through, or caught by one rule. */
 export type Intent = 'valid' | RuleId;
@@ -60,6 +94,8 @@ export interface Arrival {
   date: IsoDate;
   time: Clock;
   intent: Intent;
+  /** Some arrivals also send a voice transmission. */
+  voice?: Voice;
   /** Set when the arrival is a story beat rather than a random draw. */
   story?: string;
 }

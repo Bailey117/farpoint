@@ -77,3 +77,25 @@ export const STORY: Record<number, StoryBeat> = {
     arrival: 'team-returns',
   },
 };
+
+/** Ranks and names for team leaders (mission logs, voice transmissions). */
+export const RANKS = ['Lt.', 'Capt.', 'Sgt.', 'Dr.', 'Maj.'] as const;
+export const LEADER_FIRST = ['Mara', 'Tobias', 'Ines', 'Callum', 'Hedda', 'Ravi', 'Oona', 'Kasimir', 'Lidia', 'Emeric', 'Saoirse', 'Joachim', 'Petra', 'Yusuf', 'Wilhelmina', 'Anders'] as const;
+export const LEADER_LAST = ['Venn', 'Oduya', 'Halloran', 'Strand', 'Keszler', 'Mbatha', 'Rourke', 'Lindgren', 'Abara', 'Coulter', 'Vasquez', 'Thibault', 'Ndiaye', 'Pell', 'Marchetti', 'Ojukwu'] as const;
+
+/** World designations a mission can be sent to. */
+export const WORLDS = ['KR-9', 'TL-4', 'VO-2', 'MN-7', 'ES-3', 'HD-6', 'RW-1', 'PX-8', 'CA-5', 'DU-9', 'LY-2', 'SB-4'] as const;
+
+/** The story team's mission (it matches the bulletins). */
+export const STORY_WORLD = 'KR-9';
+
+/**
+ * Voice transmission templates. {speaker}, {team}, {count}, {origin}.
+ * They read like a tired radio call, not a form.
+ */
+export const VOICE_LINES = [
+  'Brackwater, this is {speaker}, {team} lead. {count} of us coming home from {origin}. Requesting the iris.',
+  'Annex, {team} calling. {speaker} speaking. We are {count} strong, out of {origin}, and we would very much like to come home.',
+  '{speaker} for {team}. Dialled in from {origin}, {count} souls. Open up when you are ready, Brackwater.',
+  'Brackwater Annex, {team}, {count} to come through. This is {speaker}. Origin {origin}. Over.',
+];

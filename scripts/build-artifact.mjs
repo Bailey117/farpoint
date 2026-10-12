@@ -10,6 +10,8 @@ import { join } from 'node:path';
 const [dist = 'dist', page = 'index.html', outName = 'farpoint.html'] = process.argv.slice(2);
 const index = readFileSync(join(dist, page), 'utf8');
 const title = index.match(/<title>([^<]*)<\/title>/)?.[1] ?? 'Farpoint';
+// Web-font links (Google Fonts) are kept; everything else is inlined.
+const fontLinks = [...index.matchAll(/<link[^>]+fonts\.(?:googleapis|gstatic)\.com[^>]*>/g)].map((m) => m[0]).join('\n');
 
 const jsPath = index.match(/<script[^>]*src="(?:\.\.\/)*\/?([^"]+\.js)"/)?.[1];
 const cssPath = index.match(/<link[^>]*href="(?:\.\.\/)*\/?([^"]+\.css)"/)?.[1];
@@ -27,6 +29,7 @@ const html = `<!doctype html>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>${title}</title>
+${fontLinks}
 <style>${css}</style>
 </head>
 <body>

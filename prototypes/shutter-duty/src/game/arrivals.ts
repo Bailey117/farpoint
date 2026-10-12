@@ -1,7 +1,8 @@
 /**
  * Arrival generator. Every arrival starts as a valid one (a team that may
- * come home, its current code, a safe authentication digit) and is then
- * changed in exactly one way to break one rule, if it is meant to be hostile.
+ * come home, its current code, a safe authentication digit, and sometimes a
+ * truthful voice transmission) and is then changed in exactly one way to
+ * break one rule, if it is meant to be hostile.
  *
  * The result is always checked with the rules engine: the arrival must break
  * exactly the intended rule (or none, if valid). If a draw happens to trip
@@ -9,11 +10,15 @@
  * clear right answer and one reason.
  */
 
-import { CODE_CHARS } from './data';
+import { CODE_CHARS, LEADER_FIRST, LEADER_LAST, RANKS, VOICE_LINES, WORLDS } from './data';
 import { distinctCode } from './reference';
-import { activeRules, duressDigit, judge, latestRecall } from './rules';
+import { duressDigit, judge, latestRecall, missionFor, rulesById } from './rules';
 import type { Rng } from './rng';
-import type { Arrival, Clock, Intent, Reference, RuleId, Team } from './types';
+import type { Arrival, Clock, Intent, Reference, RuleId, Team, Voice } from './types';
+
+/** Share of arrivals that send a voice transmission when voice rules are in force. */
+export const VOICE_SHARE = 0.55;
+const VOICE_INTENTS: readonly Intent[] = ['wrong-leader', 'wrong-headcount', 'wrong-origin'];
 
 /** Teams that could genuinely be coming home today. */
 function homecoming(ref: Reference): Team[] {
@@ -32,14 +37,51 @@ export function safeAuth(rng: Rng, ref: Reference): number {
   return n;
 }
 
+function voiceRulesOn(ref: Reference): boolean {
+  return ref.rules.some((r) => VOICE_INTENTS.includes(r));
+}
+
+function speak(rng: Rng, speaker: string, team: string, count: number, origin: string): Voice {
+  const text = rng
+    .pick(VOICE_LINES)
+    .replace('{speaker}', speaker)
+    .replace('{team}', team)
+    .replace('{count}', String(count))
+    .replace('{origin}', origin);
+  return { speaker, headcount: count, origin, text };
+}
+
+/** A truthful voice for this team, from its mission log entry. */
+function truthfulVoice(rng: Rng, ref: Reference, team: Team): Voice | undefined {
+  const m = missionFor(ref, team.id);
+  return m ? speak(rng, m.leader, team.name, m.size, m.destination) : undefined;
+}
+
+/** Someone else's name, a rank and name not in today's mission log. */
+function impostor(rng: Rng, ref: Reference): string {
+  const taken = new Set(ref.missions.map((m) => m.leader));
+  for (;;) {
+    const name = `${rng.pick(RANKS)} ${rng.pick(LEADER_FIRST)} ${rng.pick(LEADER_LAST)}`;
+    if (!taken.has(name)) return name;
+  }
+}
+
 /** Try to build an arrival with the given intent; undefined if today's sheet cannot produce one. */
 function draft(rng: Rng, ref: Reference, intent: Intent, time: Clock): Arrival | undefined {
+  const withVoice = voiceRulesOn(ref) && (VOICE_INTENTS.includes(intent) || rng.chance(VOICE_SHARE));
   const base = (team: Team): Arrival | undefined => {
     const code = currentCode(ref, team.id);
-    return code ? { code, auth: safeAuth(rng, ref), teamId: team.id, date: ref.date, time, intent } : undefined;
+    if (!code) return undefined;
+    const a: Arrival = { code, auth: safeAuth(rng, ref), teamId: team.id, date: ref.date, time, intent };
+    if (withVoice) {
+      const v = truthfulVoice(rng, ref, team);
+      if (v) a.voice = v;
+    }
+    return a;
   };
   const pickBase = (pool: Team[]) => (pool.length ? base(rng.pick(pool)) : undefined);
   const out = homecoming(ref);
+  const teamName = (id: string) => ref.roster.find((t) => t.id === id)!.name;
   switch (intent) {
     case 'valid':
       return pickBase(out);
@@ -78,19 +120,37 @@ function draft(rng: Rng, ref: Reference, intent: Intent, time: Clock): Arrival |
       const recalled = ref.roster.filter((t) => (t.status === 'offworld' || t.status === 'overdue') && latestRecall(ref, t.id)?.effect?.kind === 'recall');
       return pickBase(recalled);
     }
+    case 'wrong-leader': {
+      const a = pickBase(out);
+      if (!a?.voice) return undefined;
+      return { ...a, voice: speak(rng, impostor(rng, ref), teamName(a.teamId), a.voice.headcount, a.voice.origin) };
+    }
+    case 'wrong-headcount': {
+      const a = pickBase(out);
+      if (!a?.voice) return undefined;
+      // Usually one extra: someone is coming through who did not go out.
+      const n = a.voice.headcount + (rng.chance(0.75) ? 1 : -1);
+      return { ...a, voice: speak(rng, a.voice.speaker, teamName(a.teamId), n, a.voice.origin) };
+    }
+    case 'wrong-origin': {
+      const a = pickBase(out);
+      if (!a?.voice) return undefined;
+      const origin = rng.pick(WORLDS.filter((w) => w !== a.voice!.origin));
+      return { ...a, voice: speak(rng, a.voice.speaker, teamName(a.teamId), a.voice.headcount, origin) };
+    }
   }
 }
 
-/** The broken rules of an arrival, as ids (for checking the generator). */
+/** The broken rules of an arrival, as ids. */
 export function brokenRules(a: Arrival, ref: Reference): RuleId[] {
-  return judge(a, ref, ref.day).broken.map((b) => b.rule.id);
+  return judge(a, ref).broken.map((b) => b.rule.id);
 }
 
 /** An arrival with exactly the intended outcome, or undefined if impossible today. */
 export function makeArrival(rng: Rng, ref: Reference, intent: Intent, time: Clock): Arrival | undefined {
   for (let i = 0; i < 40; i++) {
     const a = draft(rng, ref, intent, time);
-    if (!a) return undefined;
+    if (!a) continue;
     const broken = brokenRules(a, ref);
     if (intent === 'valid' ? broken.length === 0 : broken.length === 1 && broken[0] === intent) return a;
   }
@@ -99,12 +159,13 @@ export function makeArrival(rng: Rng, ref: Reference, intent: Intent, time: Cloc
 
 /**
  * Choose what the next arrival will be. About 45% are genuine. Hostile ones
- * lean towards the newest rule, so each day teaches its rule.
+ * lean towards the newest rules, so each day teaches what is new.
  */
-export function chooseIntent(rng: Rng, day: number): Intent {
+export function chooseIntent(rng: Rng, ref: Reference): Intent {
   if (rng.chance(0.45)) return 'valid';
-  const rules = activeRules(day);
-  const weights = rules.map((r) => (r.day === day ? 3 : 1));
+  const rules = rulesById(ref.rules);
+  const newest = Math.max(...rules.map((r) => r.day));
+  const weights = rules.map((r) => (r.day === 0 ? 2 : r.day === newest ? 3 : 1));
   let roll = rng.next() * weights.reduce((a, b) => a + b, 0);
   for (const [i, r] of rules.entries()) {
     roll -= weights[i]!;
@@ -115,8 +176,8 @@ export function chooseIntent(rng: Rng, day: number): Intent {
 
 /** Draw the next arrival: the chosen intent if possible, else another that today's sheet allows. */
 export function nextArrival(rng: Rng, ref: Reference, time: Clock): Arrival | undefined {
-  const first = chooseIntent(rng, ref.day);
-  const fallback: Intent[] = ['valid', ...rng.shuffle(activeRules(ref.day).map((r) => r.id))];
+  const first = chooseIntent(rng, ref);
+  const fallback: Intent[] = ['valid', ...rng.shuffle(ref.rules)];
   for (const intent of [first, ...fallback]) {
     const a = makeArrival(rng, ref, intent, time);
     if (a) return a;

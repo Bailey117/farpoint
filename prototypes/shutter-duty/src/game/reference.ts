@@ -7,10 +7,10 @@
  * (day 2+), a duress digit (day 5+) and a recall tangle (day 7+).
  */
 
-import { CALLSIGNS, CODE_CHARS, FLAVOUR_BULLETINS, START_DATE, STORY, TEAMS_PER_CAMPAIGN } from './data';
-import { hamming } from './rules';
+import { CALLSIGNS, CODE_CHARS, FLAVOUR_BULLETINS, LEADER_FIRST, LEADER_LAST, RANKS, START_DATE, STORY, STORY_WORLD, TEAMS_PER_CAMPAIGN, WORLDS } from './data';
+import { activeRules, hamming } from './rules';
 import { Rng, deriveSeed } from './rng';
-import type { Bulletin, CodeEntry, IsoDate, Reference, Team, TeamStatus } from './types';
+import type { Bulletin, CodeEntry, IsoDate, Mission, Reference, RuleId, Team, TeamStatus } from './types';
 
 export interface TeamSeed {
   id: string;
@@ -58,6 +58,28 @@ export interface SheetOptions {
   lost?: readonly string[];
   /** Tell the story (campaign) or not (endless). */
   story?: boolean;
+  /** Rules in force, if not the campaign day's. */
+  rules?: RuleId[];
+}
+
+/**
+ * Each team's leader and the world it was sent to, fixed for the whole
+ * campaign so the paperwork stays consistent from day to day.
+ */
+export function teamProfiles(seed: string): Map<string, { leader: string; destination: string; size: number }> {
+  const rng = new Rng(deriveSeed(seed, 'profiles'));
+  const firsts = rng.shuffle(LEADER_FIRST);
+  const lasts = rng.shuffle(LEADER_LAST);
+  const worlds = rng.shuffle(WORLDS.filter((w) => w !== STORY_WORLD));
+  const out = new Map<string, { leader: string; destination: string; size: number }>();
+  campaignTeams(seed).forEach((t, i) => {
+    out.set(t.id, {
+      leader: `${rng.pick(RANKS)} ${firsts[i % firsts.length]} ${lasts[i % lasts.length]}`,
+      destination: t.id === STORY_TEAM_ID ? STORY_WORLD : worlds[i % worlds.length]!,
+      size: rng.int(3, 6),
+    });
+  });
+  return out;
 }
 
 export function buildReference(seed: string, day: number, opts: SheetOptions = {}): Reference {
@@ -155,5 +177,15 @@ export function buildReference(seed: string, day: number, opts: SheetOptions = {
   }
   // Shown in the order they came in, like a log: the newest is at the bottom.
   bulletins.sort((x, y) => (x.time < y.time ? -1 : 1));
-  return { day, date, roster, codes: sortedCodes, bulletins };
+
+  // Mission log: every team that is out there (or was, and is now missing).
+  const profiles = teamProfiles(seed);
+  const missions: Mission[] = roster
+    .filter((t) => t.status !== 'home')
+    .map((t) => {
+      const p = profiles.get(t.id)!;
+      return { teamId: t.id, leader: p.leader, size: p.size, destination: p.destination, departed: addDays(date, -rng.int(2, 18)) };
+    });
+  const rules = opts.rules ?? activeRules(day).map((r) => r.id);
+  return { day, date, rules, roster, codes: sortedCodes, bulletins, missions };
 }

@@ -1,12 +1,24 @@
 # Shutter Duty (working title)
 
-Proof of concept. You are the ring attendant at Brackwater Annex: incoming
-travellers send an ID code, and you have seconds to check it against the
-day's paperwork and open or close the iris. The gate is Farpoint's ring
-(`src/ui/ringView.ts`, timeline and sound at the repo root), with an iris fitted
-across its opening.
+Proof of concept. You are the ring attendant at Brackwater Annex. Teams
+coming home send an ID code, and some send a voice transmission too. You
+check them against the paperwork on your desk and open the iris, or keep it
+shut. The gate is Farpoint's ring (`src/ui/ringView.ts`, timeline and sound
+at the repo root), with an iris fitted across its opening.
 
-All names, codes and lore are original.
+The playable demo is one desk day, Papers, Please style:
+- A fixed 1600x900 landscape scene scaled to the screen; phones held upright
+  get a "turn sideways" note (Android also tries fullscreen landscape).
+- A shift clock, 08:00 to 18:00, one game minute per real second. No
+  per-arrival countdown. `?speed=N` runs it N times faster (testing aid).
+- Draggable paperwork: standing orders, code sheet, roster, mission log,
+  bulletins. Voice transcripts and citations print onto the desk.
+- Inspect mode: pick two lines and they are compared (src/game/inspect.ts).
+- Pay per correct call, citations (two warnings, then docked), and the
+  evening ledger with the household (src/game/economy.ts).
+
+The seven-day campaign and endless mode from the first prototype are still
+in `src/game/` (with their tests) and will be rebuilt on the desk.
 
 ```
 npm run dev              # from this folder (uses the repo's node_modules)

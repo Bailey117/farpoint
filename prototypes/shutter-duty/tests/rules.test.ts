@@ -64,7 +64,7 @@ describe('generated arrivals', () => {
           else expect(broken).toEqual([a.intent]);
           // Only rules in force can be the reason.
           if (a.intent !== 'valid') expect(RULES.find((r) => r.id === a.intent)!.day).toBeLessThanOrEqual(d);
-          expect(judge(a, ref, d).open).toBe(a.intent === 'valid');
+          expect(judge(a, ref).open).toBe(a.intent === 'valid');
           seen.add(`${d}:${a.intent}`);
           count++;
         }
@@ -93,7 +93,7 @@ describe('generated arrivals', () => {
     const rng = new Rng('explain');
     for (const r of RULES) {
       const a = makeArrival(rng, ref, r.id, '10:00')!;
-      const v = judge(a, ref, 7);
+      const v = judge(a, ref);
       expect(v.broken).toHaveLength(1);
       expect(v.broken[0]!.reason.length).toBeGreaterThan(10);
       expect(v.broken[0]!.reason).not.toMatch(/undefined|\{|\}/);

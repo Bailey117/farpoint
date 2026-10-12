@@ -10,7 +10,7 @@ function play(state: ShiftState, policy: (s: ShiftState) => Decision): ShiftStat
   for (let i = 0; i < 200 && s.status === 'running'; i++) s = decide(s, policy(s)).state;
   return s;
 }
-const perfect = (s: ShiftState): Decision => (judge(s.current!, s.ref, s.config.day).open ? 'open' : 'close');
+const perfect = (s: ShiftState): Decision => (judge(s.current!, s.ref).open ? 'open' : 'close');
 
 function memory(): KeyValueStorage {
   const m = new Map<string, string>();
@@ -45,7 +45,7 @@ describe('shift', () => {
   it('a timeout counts as leaving the shutter closed', () => {
     const s = startShift({ mode: 'campaign', seed: 'to', day: 1, lost: [] });
     const { result } = decide(s, 'timeout');
-    expect(result.correct).toBe(!judge(s.current!, s.ref, 1).open);
+    expect(result.correct).toBe(!judge(s.current!, s.ref).open);
   });
 
   it('three hostiles admitted ends the shift', () => {
