@@ -11,7 +11,8 @@
     "test": "vitest run",
     "balance": "vitest run --config vitest.balance.config.ts --silent=false",
     "build:artifact": "npm run build && node scripts/build-artifact.mjs",
-    "sample": "vitest run --config vitest.balance.config.ts --silent=false sim/sample.test.ts"
+    "sample": "vitest run --config vitest.balance.config.ts --silent=false sim/sample.test.ts",
+    "build:proto": "vite build --config vite.proto.config.ts && node scripts/build-artifact.mjs dist-proto proto/expedition.html expedition-prototype.html"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

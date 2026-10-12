@@ -1,14 +1,19 @@
-// Inlines the Vite build into one self-contained HTML file (dist/farpoint.html)
-// so the game can be shared as a single page. Run after `vite build`.
+// Inlines a Vite build into one self-contained HTML file so it can be shared
+// as a single page. Run after `vite build`.
+//
+//   node scripts/build-artifact.mjs [distDir] [page.html] [out.html]
+//
+// Defaults build the game: dist/index.html -> dist/farpoint.html.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dist = 'dist';
-const index = readFileSync(join(dist, 'index.html'), 'utf8');
+const [dist = 'dist', page = 'index.html', outName = 'farpoint.html'] = process.argv.slice(2);
+const index = readFileSync(join(dist, page), 'utf8');
+const title = index.match(/<title>([^<]*)<\/title>/)?.[1] ?? 'Farpoint';
 
-const jsPath = index.match(/<script[^>]*src="\/?([^"]+\.js)"/)?.[1];
-const cssPath = index.match(/<link[^>]*href="\/?([^"]+\.css)"/)?.[1];
-if (!jsPath || !cssPath) throw new Error('Could not find the built JS and CSS in dist/index.html');
+const jsPath = index.match(/<script[^>]*src="(?:\.\.\/)*\/?([^"]+\.js)"/)?.[1];
+const cssPath = index.match(/<link[^>]*href="(?:\.\.\/)*\/?([^"]+\.css)"/)?.[1];
+if (!jsPath || !cssPath) throw new Error(`Could not find the built JS and CSS in ${join(dist, page)}`);
 
 const js = readFileSync(join(dist, jsPath), 'utf8');
 const css = readFileSync(join(dist, cssPath), 'utf8');
@@ -21,7 +26,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Farpoint</title>
+<title>${title}</title>
 <style>${css}</style>
 </head>
 <body>
@@ -31,6 +36,6 @@ const html = `<!doctype html>
 </html>
 `;
 
-const out = join(dist, 'farpoint.html');
+const out = join(dist, outName);
 writeFileSync(out, html);
 console.log(`Wrote ${out} (${(Buffer.byteLength(html) / 1024).toFixed(1)} KiB)`);
