@@ -271,6 +271,20 @@ export function slotCandidates(k: Knowledge, slot: number, grammar = false): Gly
 }
 
 /**
+ * Glyphs worth placing in a slot. For an open slot, its candidates. For a
+ * solved slot, its own glyph plus any glyph that could still sit in an open
+ * slot: testing one there is a useful probe, anything else is a wasted test.
+ */
+export function pickableGlyphs(k: Knowledge, slot: number, grammar = false): GlyphId[] {
+  if (k.slotGlyph[slot] === null) return slotCandidates(k, slot, grammar);
+  const keep = new Set<GlyphId>([k.slotGlyph[slot]!]);
+  k.slotGlyph.forEach((g, i) => {
+    if (g === null) for (const c of slotCandidates(k, i, grammar)) keep.add(c);
+  });
+  return GLYPH_IDS.filter((g) => keep.has(g));
+}
+
+/**
  * Family rule: could an as-yet-unidentified glyph still be in the address?
  * Every family has at least one glyph in it; only `length - 6` families (one,
  * for the final address) may have two. A family that already has its share

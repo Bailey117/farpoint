@@ -8,6 +8,7 @@ import {
   createDecode,
   deriveKnowledge,
   dial,
+  pickableGlyphs,
   slotCandidates,
   useAid,
 } from '../src/game/decode';
@@ -224,6 +225,30 @@ describe('slotCandidates', () => {
     for (let slot = 0; slot < 6; slot++) {
       for (const g of slotCandidates(k, slot)) expect(s0.address).toContain(g);
     }
+  });
+});
+
+describe('pickableGlyphs', () => {
+  it('an open slot offers exactly its candidates', () => {
+    const s0 = createDecode('pick-open', cfg({ fragments: { knownSlots: 0, clues: 0 } }));
+    const outside = GLYPH_IDS.filter((g) => !s0.address.includes(g));
+    const k = deriveKnowledge(ok(dial(s0, [s0.address[0]!, ...outside.slice(0, 5)])).state);
+    for (const grammar of [false, true]) {
+      for (let slot = 1; slot < 6; slot++) expect(pickableGlyphs(k, slot, grammar)).toEqual(slotCandidates(k, slot, grammar));
+    }
+  });
+
+  it('a solved slot offers its glyph plus glyphs still possible in an open slot', () => {
+    const s0 = createDecode('pick-solved', cfg({ fragments: { knownSlots: 0, clues: 0 } }));
+    const a = s0.address;
+    const outside = GLYPH_IDS.filter((g) => !a.includes(g));
+    const k = deriveKnowledge(ok(dial(s0, [a[0]!, ...outside.slice(0, 5)])).state);
+    const p = pickableGlyphs(k, 0, true);
+    expect(p).toContain(a[0]);
+    for (const g of a.slice(1)) expect(p).toContain(g); // the true glyphs of the open slots
+    for (const g of outside.slice(0, 5)) expect(p).not.toContain(g); // known absent
+    // Glyphs of slot 0's family are closed by the grammar, so not worth testing.
+    for (const g of GLYPH_IDS.filter((x) => x !== a[0] && familyOf(x) === familyOf(a[0]!))) expect(p).not.toContain(g);
   });
 });
 

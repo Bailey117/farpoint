@@ -46,7 +46,7 @@ button {
   padding: 8px 14px;
   cursor: pointer;
 }
-button:hover:not(:disabled) { border-color: var(--accent); }
+button:hover:not(:disabled):not([aria-disabled="true"]) { border-color: var(--accent); }
 button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 button:disabled { cursor: not-allowed; color: var(--faint); background: var(--bg); border-style: dashed; }
 button.primary:disabled { background: var(--bg-2); color: var(--faint); border-color: var(--line); }
@@ -302,6 +302,7 @@ button.armed { border-color: var(--danger); color: var(--danger); }
 .candidates strong { color: var(--text); }
 .glyph-btn.not-here { background: var(--bg-2); color: var(--absent); }
 .glyph-btn.not-here .glyph-name { color: var(--faint); }
+.glyph-btn[aria-disabled="true"] { cursor: not-allowed; }
 
 /* Success: the slot row charges with the ring, the banner lands */
 .slot.energized, .slot.revealed.mark-locked.energized {

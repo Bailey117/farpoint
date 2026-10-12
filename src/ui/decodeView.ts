@@ -14,6 +14,7 @@ import {
   canDial,
   deriveKnowledge,
   dial,
+  pickableGlyphs,
   slotCandidates,
   useAid,
 } from '../game/decode';
@@ -263,6 +264,7 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     const slotN = cursor + 1;
     const candidates = new Set(slotCandidates(k, cursor, grammar));
     const solvedHere = k.slotGlyph[cursor];
+    const pickable = new Set(pickableGlyphs(k, cursor, grammar));
     const candidateNames = [...candidates].map(glyphName);
     const helper =
       shown.status === 'solved' || result
@@ -271,22 +273,28 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
             'p',
             { class: 'candidates', role: 'status' },
             solvedHere
-              ? [h('strong', {}, `Slot ${slotN} is solved: `), glyphName(solvedHere), '.']
+              ? [h('strong', {}, `Slot ${slotN} is solved: `), glyphName(solvedHere), '. You can test another possible glyph here instead.']
               : [
                   h('strong', {}, `Slot ${slotN}: ${candidates.size} glyph${candidates.size === 1 ? '' : 's'} could go here`),
                   candidates.size <= 8 ? ` (${candidateNames.join(', ')}).` : '. The others are dimmed.',
                 ],
           );
 
+    // Dimmed and absent glyphs cannot be picked: they could only waste a test.
+    // aria-disabled (not disabled) keeps the tooltip explaining why.
     const glyphButton = (g: GlyphId) => {
-      const notHere = !candidates.has(g) && k.glyphStatus[g] !== 'absent';
+      const blocked = !pickable.has(g);
+      const notHere = blocked && k.glyphStatus[g] !== 'absent';
       return h(
         'button',
         {
           class: `glyph-btn status-${k.glyphStatus[g]} ${draft.includes(g) ? 'in-draft' : ''} ${notHere ? 'not-here' : ''}`,
           title: `${glyphName(g)} — ${statusText(k.glyphStatus[g])}${notHere ? `; cannot go in slot ${slotN}` : ''}`,
           disabled: dialing,
-          onclick: () => placeGlyph(g),
+          'aria-disabled': blocked ? 'true' : null,
+          onclick: () => {
+            if (!blocked) placeGlyph(g);
+          },
         },
         glyphSvg(g),
         h('span', { class: 'glyph-name' }, glyphName(g)),
