@@ -122,7 +122,7 @@ function storyArrival(state: ShiftState, ref: Reference, time: string, rng: Rng)
   const auth = safeAuth(rng, ref);
   let a: Arrival | undefined;
   if (state.ref.day === 5 && team && code(team.id)) {
-    a = { code: code(team.id)!, auth, teamId: team.id, date: ref.date, time, intent: 'missing', story: `${team.name}'s code. A voice on the line says it is them, and asks for the shutter.` };
+    a = { code: code(team.id)!, auth, teamId: team.id, date: ref.date, time, intent: 'missing', story: `${team.name}'s code. A voice on the line says it is them, and asks you to open the iris.` };
   } else if (state.ref.day === 6) {
     // Someone using a withdrawn code series, claiming to be a team that is really out there.
     const claimant = ref.roster.find((t) => t.id !== STORY_TEAM_ID && t.status === 'offworld');

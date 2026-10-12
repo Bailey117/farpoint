@@ -73,7 +73,6 @@ kbd { font: 600 0.8rem ui-monospace, monospace; border: 1px solid currentColor; 
 @media (max-width: 640px) {
   .desk { grid-template-columns: 1fr; grid-template-areas: 'centre' 'tx' 'controls' 'ref'; padding: 10px; }
   .controls { position: sticky; bottom: 0; z-index: 2; }
-  .portal { width: min(100%, 210px); }
   .status { min-height: 0; }
   .fields .code { font-size: 1.35rem; }
 }
@@ -124,38 +123,23 @@ button.big.close:not(:disabled) { background: #4e1f1b; border-color: var(--bad);
 .calls tr.miss td:nth-child(4) { color: var(--bad); font-weight: 600; }
 @media (max-width: 640px) { .calls th:nth-child(3), .calls td:nth-child(3) { display: none; } }
 
-/* Portal */
-.portal { width: min(100%, 380px); aspect-ratio: 1; }
-.portal-svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.frame-outer { fill: #2a2f35; stroke: #0b0d0f; stroke-width: 6; }
-.frame-inner { fill: none; stroke: #0b0d0f; stroke-width: 6; }
-.segment { fill: #3a4148; stroke: #1b1f23; stroke-width: 1.5; transition: fill 0.25s ease, filter 0.25s ease; }
-.segment.lit { fill: var(--cyan); filter: drop-shadow(0 0 5px var(--cyan)); }
-.aperture-rim { fill: none; stroke: #0b0d0f; stroke-width: 4; }
-.surface { opacity: 0; transition: opacity 0.8s ease; }
-.incoming .surface { opacity: 1; }
-.swirl { fill: none; stroke: rgba(233, 251, 255, 0.55); stroke-width: 3; stroke-dasharray: 40 22; transform-origin: 0 0; }
-.incoming .swirl.s1 { animation: spin 7s linear infinite; }
-.incoming .swirl.s2 { animation: spin 5s linear infinite reverse; }
-.incoming .swirl.s3 { animation: spin 3.5s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.slat { transition: transform 0.45s cubic-bezier(0.6, 0, 0.3, 1); transition-delay: calc((6 - var(--i)) * 45ms); }
-.open .slat { transform: translateY(-300px); transition-delay: calc(var(--i) * 45ms); }
-.slat-edge { stroke: #1b1f23; stroke-width: 2; }
-.rivet { fill: #8a929c; }
-.shutter { filter: drop-shadow(0 0 0 transparent); }
-.incoming:not(.open) .shutter { filter: drop-shadow(0 0 6px rgba(127, 224, 232, 0.65)); }
-.flash-ring { fill: none; stroke: transparent; stroke-width: 10; }
-.flash-good .flash-ring { animation: flash-good 0.9s ease-out; }
-.flash-bad .flash-ring { animation: flash-bad 1.1s ease-out; }
-@keyframes flash-good { 0% { stroke: rgba(95, 208, 143, 0.9); } 100% { stroke: transparent; } }
-@keyframes flash-bad { 0%, 30% { stroke: rgba(255, 122, 107, 0.95); } 100% { stroke: transparent; } }
+/* The gate: Farpoint's ring with an iris across the opening. */
+.gate { width: min(100%, 400px); aspect-ratio: 1; border-radius: 50%; position: relative; }
+.ring-wrap { width: 100%; height: 100%; aspect-ratio: 1; will-change: transform; }
+.ring { width: 100%; height: 100%; display: block; overflow: visible; }
+.gate::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 transparent; }
+.gate.flash-good::after { animation: halo-good 0.9s ease-out; }
+.gate.flash-bad::after { animation: halo-bad 1.1s ease-out; }
+@keyframes halo-good { 0% { box-shadow: 0 0 0 6px rgba(95, 208, 143, 0.9), 0 0 40px rgba(95, 208, 143, 0.6); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes halo-bad { 0%, 30% { box-shadow: 0 0 0 6px rgba(255, 122, 107, 0.95), 0 0 50px rgba(255, 122, 107, 0.7); } 100% { box-shadow: 0 0 0 0 transparent; } }
 .shake { animation: shake 0.5s; }
 @keyframes shake { 0%, 100% { transform: translate(0); } 20% { transform: translate(-7px, 3px); } 40% { transform: translate(6px, -4px); } 60% { transform: translate(-5px, 2px); } 80% { transform: translate(4px, -2px); } }
-.impact .shutter { animation: impact 0.96s; }
-@keyframes impact { 0%, 33%, 66%, 100% { transform: translateY(0); } 8%, 41%, 74% { transform: translateY(4px); } }
+.impact .iris { animation: impact 0.96s; }
+@keyframes impact { 0%, 33%, 66%, 100% { transform: translate(0, 0); } 8%, 41%, 74% { transform: translate(0, 3px) scale(0.99); } }
+.iris-seam { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 8px currentColor); }
+.origin { display: flex; gap: 4px; flex-wrap: wrap; }
+.origin svg { width: 24px; height: 24px; }
 @media (prefers-reduced-motion: reduce) {
-  .incoming .swirl { animation: none !important; }
-  .shake, .impact .shutter { animation: none !important; }
-  .slat, .open .slat { transition-duration: 0.1s; }
+  .shake, .impact .iris { animation: none !important; }
 }
+@media (max-width: 640px) { .gate { width: min(100%, 240px); } }

@@ -34,6 +34,11 @@ export function setSound(on: boolean) {
   }
 }
 
+/** The shared audio context (also used by the ring's sound), or null when sound is off or unavailable. */
+export function audioContext(): AudioContext | null {
+  return audio()?.ctx ?? null;
+}
+
 function audio(): { ctx: AudioContext; out: GainNode } | null {
   if (!enabled) return null;
   try {

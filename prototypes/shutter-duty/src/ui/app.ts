@@ -10,7 +10,10 @@ import { Rng, deriveSeed } from '../game/rng';
 import { type CallResult, type Decision, HOSTILE_LIMIT, type Mode, type ShiftReport, type ShiftState, decide, report, startShift, timeLimit } from '../game/shift';
 import type { Reference, TeamStatus } from '../game/types';
 import { h } from './dom';
-import { Portal } from './portal';
+import { FAMILIES, type GlyphId, familyOf, glyphName } from '../../../../src/game/glyphs';
+import { FAMILY_COLOR } from '../../../../src/ui/families';
+import { glyphSvg } from '../../../../src/ui/glyphArt';
+import { Gate } from './gate';
 import { cue, setSound, soundOn } from './sound';
 
 const storage: KeyValueStorage = {
@@ -21,6 +24,12 @@ const storage: KeyValueStorage = {
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const freshSeed = () => `shift-${Date.now().toString(36)}`;
+
+/** The address an arrival dials in from: one glyph from each family, fixed per transmission (cosmetic). */
+function originOf(a: { code: string; date: string; time: string }): GlyphId[] {
+  const rng = new Rng(deriveSeed(a.code, `${a.date} ${a.time}`));
+  return rng.shuffle(FAMILIES.map((f) => rng.pick(f.glyphs as readonly GlyphId[])));
+}
 
 const STATUS_LABEL: Record<TeamStatus, string> = { offworld: 'Off-world', overdue: 'Overdue', home: 'On base', missing: 'Missing' };
 
@@ -68,7 +77,7 @@ export function startApp(root: HTMLElement) {
         { class: 'title' },
         h('section', { class: 'card intro' },
           h('h1', {}, 'Shutter Duty'),
-          h('p', {}, `You are the ring attendant at ${BASE_NAME}, the Survey's second ring site. Teams coming home send an ID code before they step through. You have seconds to check it against today's paperwork and decide: open the shutter, or keep it shut.`),
+          h('p', {}, `You are the ring attendant at ${BASE_NAME}, the Survey's second ring site. Teams coming home send an ID code before they step through. You have seconds to check it against today's paperwork and decide: open the iris, or keep it shut.`),
           h('p', { class: 'muted' }, 'Open for a hostile and the base takes the damage. Keep a genuine team out and they are lost for good.'),
           notice ? h('p', { class: 'warn' }, notice) : null,
         ),
@@ -127,7 +136,7 @@ export function startApp(root: HTMLElement) {
 
   function shift(initial: ShiftState) {
     let state = initial;
-    const portal = new Portal();
+    const gate = new Gate();
     const gaps = new Rng(deriveSeed(state.config.seed, `gaps-${state.config.day}`));
     const timers: ReturnType<typeof setTimeout>[] = [];
     let raf = 0;
@@ -138,7 +147,7 @@ export function startApp(root: HTMLElement) {
 
     const transmission = h('section', { class: 'panel transmission', 'aria-live': 'polite' });
     const reference = h('section', { class: 'panel reference' });
-    const status = h('p', { class: 'status', role: 'status' }, 'Shutter closed. Waiting for the ring.');
+    const status = h('p', { class: 'status', role: 'status' }, 'Iris closed. Waiting for the ring.');
     const clockFill = h('div', { class: 'clock-fill' });
     const clockNum = h('span', { class: 'clock-num' }, '');
     const openBtn = h('button', { class: 'big open', disabled: true }, 'OPEN ', h('kbd', {}, 'O'));
@@ -153,7 +162,7 @@ export function startApp(root: HTMLElement) {
         'main',
         { class: 'desk' },
         transmission,
-        h('section', { class: 'centre' }, portal.root, status),
+        h('section', { class: 'centre' }, gate.el, status),
         reference,
         h('section', { class: 'controls' }, h('div', { class: 'clock' }, clockFill, clockNum), h('div', { class: 'buttons' }, openBtn, closeBtn)),
       ),
@@ -172,6 +181,7 @@ export function startApp(root: HTMLElement) {
       document.removeEventListener('keydown', onKey);
       timers.forEach(clearTimeout);
       cancelAnimationFrame(raf);
+      gate.dispose();
     };
 
     function drawTransmission(a: ShiftState['current']) {
@@ -187,6 +197,7 @@ export function startApp(root: HTMLElement) {
           h('dt', {}, 'ID code'), h('dd', { class: 'code' }, a.code),
           h('dt', {}, 'Claims to be'), h('dd', {}, `Team ${name}`),
           h('dt', {}, 'Sent'), h('dd', { class: 'mono' }, `${a.date} ${a.time}`),
+          h('dt', {}, 'Dialled from'), h('dd', { class: 'origin' }, originOf(a).map((g) => h('span', { style: `color:${FAMILY_COLOR[familyOf(g)]}`, title: glyphName(g) }, glyphSvg(g)))),
           state.config.day >= 5 ? h('dt', {}, 'Auth digit') : null,
           state.config.day >= 5 ? h('dd', { class: 'code small' }, String(a.auth)) : null,
         ),
@@ -199,12 +210,11 @@ export function startApp(root: HTMLElement) {
         finish();
         return;
       }
-      status.textContent = 'Shutter closed. Waiting for the ring.';
+      status.textContent = 'Iris closed. Waiting for the ring.';
       later(gaps.int(700, 2200), () => {
-        cue('incoming');
-        portal.setIncoming(true, reducedMotion());
-        status.textContent = 'Incoming wormhole. Check the transmission.';
-        later(900, () => {
+        status.textContent = 'Incoming wormhole.';
+        void gate.incoming(originOf(state.current!), () => {
+          status.textContent = 'Wormhole established. Check the transmission.';
           drawTransmission(state.current);
           startClock();
         });
@@ -248,33 +258,33 @@ export function startApp(root: HTMLElement) {
 
     function showResult(r: CallResult) {
       const name = state.ref.roster.find((t) => t.id === r.arrival.teamId)?.name ?? r.arrival.teamId;
-      const timeout = r.decision === 'timeout' ? 'Out of time: the shutter stayed shut. ' : '';
+      const timeout = r.decision === 'timeout' ? 'Out of time: the iris stayed shut. ' : '';
       let text = '';
       if (r.decision === 'open') {
-        portal.setShutter(true);
+        void gate.openIris();
         cue('open');
       } else cue('clank');
-      later(r.decision === 'open' ? 550 : 200, () => {
+      later(r.decision === 'open' ? 700 : 200, () => {
         switch (r.outcome) {
           case 'admitted':
             text = `Correct. Team ${name} is home.`;
-            portal.flash('good');
+            gate.flash('good');
             cue('correct');
             break;
           case 'refused':
             text = `${timeout}Correct to refuse. ${r.reason}`;
-            portal.flash('good');
+            gate.flash('good');
             cue('correct');
             break;
           case 'hostile-admitted':
             text = `Hostile admitted. ${r.reason} The base takes damage.`;
-            portal.flash('bad');
+            gate.flash('bad');
             cue('alarm');
             break;
           case 'friendly-lost':
-            text = `${timeout}Team ${name} was genuine. They hit the shutter and are lost.`;
-            portal.impact();
-            portal.flash('bad');
+            text = `${timeout}Team ${name} was genuine. They hit the iris and are lost.`;
+            gate.impact();
+            gate.flash('bad');
             cue('thud');
             break;
         }
@@ -285,16 +295,18 @@ export function startApp(root: HTMLElement) {
         bar = fresh;
         if (r.outcome === 'friendly-lost' || r.outcome === 'hostile-admitted') drawReference(reference, state.ref, state.config.day);
       });
-      later(r.correct ? 2300 : 3600, () => {
-        portal.setShutter(false);
-        if (r.decision === 'open') cue('close');
-        portal.setIncoming(false);
+      later(r.correct ? 2300 : 3600, async () => {
+        if (r.decision === 'open') {
+          cue('close');
+          await gate.closeIris();
+        }
         cue('collapse');
         status.className = 'status';
         drawTransmission(null);
         clockFill.style.width = '0%';
         clockNum.textContent = '';
-        later(500, nextArrival);
+        await gate.collapse();
+        later(300, nextArrival);
       });
     }
     function finish() {

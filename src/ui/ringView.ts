@@ -52,6 +52,11 @@ let uid = 0;
 
 export class RingView {
   readonly el: HTMLDivElement;
+  /**
+   * An empty layer over the event surface and under the chevrons, for things
+   * fitted across the opening (radius 107), such as Shutter Duty's iris.
+   */
+  readonly apertureLayer: SVGGElement;
   private readonly svg: SVGSVGElement;
   private readonly rotor: SVGGElement;
   private readonly rimOuter: SVGCircleElement;
@@ -172,6 +177,7 @@ export class RingView {
     this.veilDisc = el('circle', { r: 135, fill: `url(#${this.ids.veil})`, filter: `url(#${this.ids.veilFx})` }, this.veilGroup);
     this.veilRings = [0, 1, 2].map(() => el('circle', { r: 10, fill: 'none', stroke: '#d9f0ff', 'stroke-width': 2, opacity: 0 }, this.veilGroup));
     this.flash = el('circle', { r: 108, fill: '#eef8ff', opacity: 0 }, this.svg);
+    this.apertureLayer = el('g', { class: 'aperture-layer' }, this.svg);
 
     // Chevrons and keystone.
     this.chevronLayer = el('g', {}, this.svg);

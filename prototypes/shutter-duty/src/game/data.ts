@@ -26,7 +26,7 @@ export const SHIFT_START = 8 * 60;
 
 export const FLAVOUR_BULLETINS = [
   'Ring diagnostics nominal. Report any flicker in the outer band.',
-  'Primary reminds all sites: shutter tests at the start of every shift.',
+  'Primary reminds all sites: iris tests at the start of every shift.',
   'Canteen closed 12:00-13:00 for decontamination.',
   'Medical asks returning teams to report for screening within the hour.',
   'Power draw on the ring is up 4% this week. Engineering is aware.',

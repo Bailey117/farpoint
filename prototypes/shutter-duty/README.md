@@ -2,7 +2,9 @@
 
 Proof of concept. You are the ring attendant at Brackwater Annex: incoming
 travellers send an ID code, and you have seconds to check it against the
-day's paperwork and open or close the shutter.
+day's paperwork and open or close the iris. The gate is Farpoint's ring
+(`src/ui/ringView.ts`, timeline and sound at the repo root), with an iris fitted
+across its opening.
 
 All names, codes and lore are original.
 

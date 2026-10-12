@@ -61,7 +61,7 @@ export const RULES: readonly Rule[] = [
     id: 'unlisted',
     day: 1,
     title: 'Valid codes only',
-    briefing: 'Open the shutter only for an ID code on today\'s valid list, issued to the team that sends it.',
+    briefing: 'Open the iris only for an ID code on today\'s valid list, issued to the team that sends it.',
     check(a, ref) {
       if (entryFor(a, ref) || nearMiss(a.code, ref)) return null;
       const other = ref.codes.find((c) => c.code === a.code);
