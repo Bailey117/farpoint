@@ -19,6 +19,7 @@ npm run dev        # dev server
 npm run typecheck
 npm test
 npm run build
+npm run build:artifact   # single self-contained page at dist/farpoint.html
 npm run balance    # playtest-bot balance report (slow; RUNS=N to change)
 ```
 

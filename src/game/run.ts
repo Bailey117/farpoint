@@ -51,9 +51,11 @@ export const RUN_CONFIG = {
   dialCost: 8,
   probeCost: 5,
   /** Base reactor output added every time a team comes home (or is lost). */
-  returnTrickle: 9,
+  returnTrickle: 7,
   /** Generator: this much salvage buys this much power. */
   generator: { salvage: 10, power: 15 },
+  /** Wound steps every survivor recovers for free on coming home. */
+  restHeal: 1,
   /** Infirmary: salvage per wound step healed. */
   healCost: 12,
   itemCost: { reveal: 20, eliminate: 10, freeDial: 12 } as Record<AidKind, number>,
@@ -63,8 +65,8 @@ export const RUN_CONFIG = {
   recruitChance: 0.5,
   startLeads: 2,
   maxOpenLeads: 4,
-  startLeadFragments: { knownSlots: 2, clues: 3 },
-  newLeadFragments: { knownSlots: 1, clues: 2 },
+  startLeadFragments: { knownSlots: 1, clues: 2 },
+  newLeadFragments: { knownSlots: 0, clues: 2 },
   /** Chance a fragment found on a hazard >= minHazard world belongs to the final address. */
   finalFragment: { chance: 0.3, minHazard: 3 },
   /** Clues needed on the final address before it can be decoded. */
@@ -86,6 +88,8 @@ export interface Lead {
   /** RNG state for aid effects on this lead. */
   rngState: number;
   solved: boolean;
+  /** Follows the family grammar. Absent on leads saved before it existed. */
+  grammar?: boolean;
 }
 
 export interface KnownWorld {
@@ -164,7 +168,7 @@ function newLead(leads: readonly Lead[], rng: Rng, final: boolean, fragments: { 
   const worldSeed = Math.floor(rng.next() * 2 ** 32);
   const address = generateAddress(rng, final ? FINAL_ADDRESS_LENGTH : STANDARD_ADDRESS_LENGTH);
   const facts = generateFragmentFacts(rng, address, fragments);
-  return { id, final, worldSeed, address, facts, attempts: [], rngState: Math.floor(rng.next() * 2 ** 32), solved: false };
+  return { id, final, worldSeed, address, facts, attempts: [], rngState: Math.floor(rng.next() * 2 ** 32), solved: false, grammar: true };
 }
 
 export function newRun(seed: string, config: RunConfig = RUN_CONFIG): RunState {
@@ -348,6 +352,7 @@ export function decodeStateFor(run: RunState, leadId: string, config: RunConfig 
     aids: { ...run.items },
     status: 'active',
     rngState: lead.rngState,
+    grammar: lead.grammar === true,
   });
 }
 
@@ -513,7 +518,7 @@ export function finishExcursion(run: RunState, config: RunConfig = RUN_CONFIG): 
 
   // Team: the living rest one wound step; the dead (and the stranded) are fallen.
   const fallenNow = lost ? exp.team : exp.team.filter((m) => !isAlive(m));
-  const survivors = lost ? [] : exp.team.filter(isAlive).map((m) => changeWounds(m, -1));
+  const survivors = lost ? [] : exp.team.filter(isAlive).map((m) => changeWounds(m, -config.restHeal));
   const stayedHome = run.team.filter((m) => !returnedIds.has(m.id) && isAlive(m));
   next.team = [...survivors, ...stayedHome];
   next.fallen = [...run.fallen, ...fallenNow.map((m) => ({ ...m, wounds: 3 as const }))];

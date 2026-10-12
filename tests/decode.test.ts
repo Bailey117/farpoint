@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { factHolds } from '../src/game/address';
+import { factHolds, followsGrammar, generateAddress } from '../src/game/address';
 import {
   type DecodeConfig,
   type DecodeState,
@@ -11,7 +11,7 @@ import {
   slotCandidates,
   useAid,
 } from '../src/game/decode';
-import { GLYPH_IDS, type GlyphId } from '../src/game/glyphs';
+import { FAMILIES, GLYPH_IDS, type GlyphId, familyOf } from '../src/game/glyphs';
 import { Rng } from '../src/game/rng';
 
 function ok<T extends { ok: boolean }>(r: T): Extract<T, { ok: true }> {
@@ -224,5 +224,77 @@ describe('slotCandidates', () => {
     for (let slot = 0; slot < 6; slot++) {
       for (const g of slotCandidates(k, slot)) expect(s0.address).toContain(g);
     }
+  });
+});
+
+describe('family grammar', () => {
+  it('generated addresses use one glyph per family (7-glyph: exactly one family twice)', () => {
+    const rng = new Rng('grammar');
+    for (let i = 0; i < 300; i++) {
+      for (const len of [6, 7]) {
+        const a = generateAddress(rng, len);
+        expect(followsGrammar(a)).toBe(true);
+        const fams = new Set(a.map(familyOf));
+        expect(fams.size).toBe(6);
+        expect(new Set(a).size).toBe(len);
+      }
+    }
+    // Opting out still gives plain random addresses.
+    const plain = Array.from({ length: 200 }, () => generateAddress(rng, 6, false));
+    expect(plain.some((a) => !followsGrammar(a))).toBe(true);
+  });
+
+  it('candidates under the grammar never exclude the true glyph', () => {
+    for (const len of [6, 7]) {
+      for (let i = 0; i < 80; i++) {
+        let s = createDecode(`gram-${len}-${i}`, cfg({ length: len, power: 1000 }));
+        expect(s.grammar).toBe(true);
+        const rng = new Rng(`g${i}`);
+        for (let d = 0; d < 6 && s.status === 'active'; d++) {
+          const k = deriveKnowledge(s);
+          s.address.forEach((g, slot) => expect(slotCandidates(k, slot, true)).toContain(g));
+          s = ok(dial(s, rng.sample(GLYPH_IDS, len))).state;
+        }
+      }
+    }
+  });
+
+  it('identifying a glyph closes the rest of its family (6-glyph address)', () => {
+    const s0 = createDecode('gram-close', cfg({ fragments: { knownSlots: 0, clues: 0 } }));
+    const a = s0.address;
+    const outside = GLYPH_IDS.filter((g) => !a.includes(g));
+    // Put a[0] in the wrong slot: it becomes 'present'.
+    const s1 = ok(dial(s0, [a[1]!, a[0]!, ...outside.slice(0, 4)])).state;
+    const k = deriveKnowledge(s1);
+    const fam = FAMILIES.find((f) => (f.glyphs as readonly string[]).includes(a[0]!))!;
+    const siblings = fam.glyphs.filter((g) => g !== a[0]);
+    for (let slot = 0; slot < 6; slot++) {
+      const c = slotCandidates(k, slot, true);
+      for (const sib of siblings) expect(c).not.toContain(sib);
+      // Without the grammar, the siblings are still possible somewhere.
+    }
+    expect(siblings.some((sib) => slotCandidates(k, 2, false).includes(sib))).toBe(true);
+  });
+
+  it('the final address leaves room for exactly one doubled family', () => {
+    const s0 = createDecode('gram-final', cfg({ length: 7, fragments: { knownSlots: 0, clues: 0 } }));
+    const a = s0.address;
+    const counts = new Map<string, number>();
+    for (const g of a) counts.set(familyOf(g), (counts.get(familyOf(g)) ?? 0) + 1);
+    const doubled = [...counts.entries()].find(([, c]) => c === 2)![0];
+    const pair = a.filter((g) => familyOf(g) === doubled);
+    const single = a.find((g) => familyOf(g) !== doubled)!;
+    const outside = GLYPH_IDS.filter((g) => !a.includes(g));
+    // Identify one glyph of a single family: its siblings stay possible (it might be the doubled one).
+    const s1 = ok(dial(s0, [single, ...outside.slice(0, 6)].reverse())).state;
+    const sibOfSingle = FAMILIES.find((f) => (f.glyphs as readonly string[]).includes(single))!.glyphs.filter((g) => g !== single && !a.includes(g));
+    const k1 = deriveKnowledge(s1);
+    const openSlot = k1.slotGlyph.findIndex((g) => g === null);
+    expect(sibOfSingle.some((g) => slotCandidates(k1, openSlot, true).includes(g))).toBe(true);
+    // Identify both glyphs of the doubled family: now every family with an identified glyph is closed.
+    const s2 = ok(dial(s1, [pair[0]!, pair[1]!, single, ...outside.slice(6, 10)].reverse())).state;
+    const k2 = deriveKnowledge(s2);
+    const slot2 = k2.slotGlyph.findIndex((g) => g === null);
+    for (const g of sibOfSingle) expect(slotCandidates(k2, slot2, true)).not.toContain(g);
   });
 });

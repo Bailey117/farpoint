@@ -8,7 +8,7 @@
  */
 
 import { ENCOUNTERS } from '../src/data/encounters';
-import { type DecodeState, createDecode, deriveKnowledge, dial, useAid } from '../src/game/decode';
+import { type DecodeState, createDecode, deriveKnowledge, dial, slotCandidates, useAid } from '../src/game/decode';
 import type { Choice, Effect, Outcome } from '../src/game/encounter';
 import {
   type ExpeditionState,
@@ -19,7 +19,7 @@ import {
   returnHome,
   successChance,
 } from '../src/game/expedition';
-import { GLYPH_IDS, type GlyphId } from '../src/game/glyphs';
+import { FAMILIES, GLYPH_IDS, type GlyphId, familyOf } from '../src/game/glyphs';
 import { Rng } from '../src/game/rng';
 import {
   RUN_CONFIG,
@@ -28,6 +28,7 @@ import {
   buyItem,
   callUpRecruit,
   canPayDial,
+  chargeCapacitor,
   convertSalvage,
   decodeStateFor,
   dialKnownWorld,
@@ -63,8 +64,16 @@ export function consistentGuess(ds: DecodeState, rng: Rng): GlyphId[] | null {
   const slots: (GlyphId | null)[] = k.slotGlyph.slice();
   const used = new Set(slots.filter((g): g is GlyphId => g !== null));
   const required = new Set(GLYPH_IDS.filter((g) => (k.glyphStatus[g] === 'present' || k.glyphStatus[g] === 'locked') && !used.has(g)));
-  const unknown = GLYPH_IDS.filter((g) => k.glyphStatus[g] === 'unknown');
   const empty = rng.shuffle([...Array(n).keys()].filter((i) => slots[i] === null));
+  const grammar = ds.grammar === true;
+  // A full guess must itself obey the grammar: one per family, plus extras.
+  const famOk = (g: GlyphId) => {
+    if (!grammar) return true;
+    const counts = new Map<string, number>();
+    for (const x of slots) if (x) counts.set(familyOf(x), (counts.get(familyOf(x)) ?? 0) + 1);
+    const extrasUsed = [...counts.values()].reduce((a, c) => a + Math.max(0, c - 1), 0);
+    return (counts.get(familyOf(g)) ?? 0) === 0 || extrasUsed < n - FAMILIES.length;
+  };
 
   const fill = (idx: number): boolean => {
     const missing = [...required].filter((g) => !used.has(g)).length;
@@ -72,7 +81,8 @@ export function consistentGuess(ds: DecodeState, rng: Rng): GlyphId[] | null {
     if (idx === empty.length) return missing === 0;
     const i = empty[idx]!;
     const req = rng.shuffle([...required].filter((g) => !used.has(g)));
-    const candidates = [...req, ...rng.shuffle(unknown.filter((g) => !used.has(g)))].filter((g) => !k.slotExcluded[i]!.has(g));
+    const others = rng.shuffle(slotCandidates(k, i, grammar).filter((g) => !used.has(g) && !required.has(g)));
+    const candidates = [...req, ...others].filter((g) => !k.slotExcluded[i]!.has(g) && famOk(g));
     for (const g of candidates) {
       slots[i] = g;
       used.add(g);
@@ -96,7 +106,10 @@ export function explorerGuess(ds: DecodeState, rng: Rng): GlyphId[] | null {
   const k = deriveKnowledge(ds);
   const n = ds.address.length;
   const identified = GLYPH_IDS.filter((g) => k.glyphStatus[g] === 'present' || k.glyphStatus[g] === 'locked').length;
-  const unknown = rng.shuffle(GLYPH_IDS.filter((g) => k.glyphStatus[g] === 'unknown'));
+  // Only test glyphs that could still be in the address (the family rule closes some).
+  const openSlots = k.slotGlyph.flatMap((g, i) => (g ? [] : [i]));
+  const possible = new Set(openSlots.flatMap((i) => slotCandidates(k, i, ds.grammar === true)));
+  const unknown = rng.shuffle(GLYPH_IDS.filter((g) => k.glyphStatus[g] === 'unknown' && possible.has(g)));
   if (identified >= n || unknown.length === 0) return consistentGuess(ds, rng);
   const slots: (GlyphId | null)[] = Array(n).fill(null);
   const lockedSlots = new Set(k.slotGlyph.flatMap((g, i) => (g ? [i] : [])));
@@ -350,6 +363,11 @@ export function playRun(seed: string, style: Style, maxExpeditions = 80): RunRep
     if (livingTeam(run).length === 0) { rep.why = 'no living team at base'; break; }
 
     const fin = finalLead(run)!;
+    if (!canPayDial(run) && run.items.freeDial > 0) {
+      // Charge a capacitor at the base so the next dial is free.
+      const c = chargeCapacitor(run);
+      if (c.ok) run = c.run;
+    }
     if (fin.solved) {
       if (!canPayDial(run)) { rep.why = 'cannot pay final redial'; break; }
       run = (dialKnownWorld(run, fin.id) as { run: RunState }).run;

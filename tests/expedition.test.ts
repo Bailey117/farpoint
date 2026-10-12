@@ -149,10 +149,12 @@ describe('choose', () => {
         expect(r.value.text).toBe('Cy wins.');
       } else {
         sawLoss = true;
+        const { harshFailure } = DEFAULT_EXPEDITION_CONFIG;
+        const expected = 1 + (WORLD.hazard >= harshFailure.hazard ? harshFailure.extra : 0);
         expect(r.state.haul.salvage).toBe(0);
-        expect(actor.wounds).toBe(1);
+        expect(actor.wounds).toBe(expected);
         expect(r.value.text).toBe('Cy loses.');
-        expect(r.value.applied).toContainEqual({ kind: 'wound', memberId: 'c', from: 0, to: 1, died: false });
+        expect(r.value.applied).toContainEqual({ kind: 'wound', memberId: 'c', from: 0, to: expected, died: false });
       }
     }
     expect(sawWin && sawLoss).toBe(true);
@@ -364,5 +366,36 @@ describe('generateTeam', () => {
     expect(t.map((m) => m.role)).toEqual(['soldier', 'scientist', 'linguist', 'medic']);
     for (const m of t) for (const v of Object.values(m.stats)) expect(v).toBeGreaterThanOrEqual(1), expect(v).toBeLessThanOrEqual(5);
     expect(generateTeam(new Rng('team'))).toEqual(t);
+  });
+});
+
+describe('harsh failures on dangerous worlds', () => {
+  const failing = (hazard: number) => {
+    // Find a seed where the scientist (20%) fails the grit check.
+    for (let i = 0; i < 200; i++) {
+      const s = startExpedition({ ...WORLD, hazard, seed: i }, TEAM, 50);
+      const r = ok(choose(s, DEFS, 'check', 'c'));
+      if (!r.value.success) return r;
+    }
+    throw new Error('no failure found');
+  };
+
+  it('failed checks wound one step more from the configured hazard up', () => {
+    const { harshFailure } = DEFAULT_EXPEDITION_CONFIG;
+    const calm = failing(harshFailure.hazard - 1);
+    expect(calm.state.team.find((m) => m.id === 'c')!.wounds).toBe(1);
+    const harsh = failing(harshFailure.hazard);
+    expect(harsh.state.team.find((m) => m.id === 'c')!.wounds).toBe(1 + harshFailure.extra);
+  });
+
+  it('successes are never made harsher', () => {
+    for (let i = 0; i < 200; i++) {
+      const s = startExpedition({ ...WORLD, hazard: 5, seed: i }, TEAM, 50);
+      const r = ok(choose(s, DEFS, 'check', 's'));
+      if (r.value.success) {
+        expect(r.state.team.every((m) => m.wounds === 0)).toBe(true);
+        return;
+      }
+    }
   });
 });

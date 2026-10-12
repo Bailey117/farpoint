@@ -8,7 +8,7 @@
  *   - 'absent'   : this glyph is not in the address at all
  */
 
-import { GLYPH_IDS, type GlyphId, isGlyphId } from './glyphs';
+import { FAMILIES, GLYPH_IDS, type GlyphId, familyOf, isGlyphId } from './glyphs';
 import type { Rng } from './rng';
 
 export type Address = readonly GlyphId[];
@@ -18,11 +18,29 @@ export const FINAL_ADDRESS_LENGTH = 7;
 
 export type Mark = 'locked' | 'drifting' | 'absent';
 
-export function generateAddress(rng: Rng, length: number = STANDARD_ADDRESS_LENGTH): GlyphId[] {
+/**
+ * A random address. With `grammar` (the default) it follows the family
+ * rule: one glyph from each family (as many families as fit), any extra
+ * glyphs drawn from the rest, all in random order.
+ */
+export function generateAddress(rng: Rng, length: number = STANDARD_ADDRESS_LENGTH, grammar = true): GlyphId[] {
   if (length < 1 || length > GLYPH_IDS.length) {
     throw new Error(`Invalid address length ${length}`);
   }
-  return rng.sample(GLYPH_IDS, length);
+  if (!grammar) return rng.sample(GLYPH_IDS, length);
+  const families = rng.shuffle(FAMILIES).slice(0, Math.min(length, FAMILIES.length));
+  const picked: GlyphId[] = families.map((f) => rng.pick(f.glyphs));
+  const rest = GLYPH_IDS.filter((g) => !picked.includes(g));
+  picked.push(...rng.sample(rest, length - picked.length));
+  return rng.shuffle(picked);
+}
+
+/** Does this address follow the family rule? */
+export function followsGrammar(address: Address): boolean {
+  const counts = new Map<string, number>();
+  for (const g of address) counts.set(familyOf(g), (counts.get(familyOf(g)) ?? 0) + 1);
+  const families = Math.min(address.length, FAMILIES.length);
+  return counts.size === families && [...counts.values()].reduce((a, c) => a + Math.max(0, c - 1), 0) === address.length - families;
 }
 
 export type GuessProblem =

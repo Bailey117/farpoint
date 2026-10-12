@@ -274,7 +274,6 @@ button.danger { border-color: var(--danger); color: var(--danger); }
 .dial-screen { max-width: 620px; margin: 0 auto; padding: 16px; }
 
 .slot.probing { border-style: dashed; border-color: var(--accent); }
-.tip { font-size: 0.875rem; margin-top: -6px; }
 .more-worlds summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; padding: 6px 0; }
 
 button.armed { border-color: var(--danger); color: var(--danger); }
@@ -303,8 +302,6 @@ button.armed { border-color: var(--danger); color: var(--danger); }
 .candidates strong { color: var(--text); }
 .glyph-btn.not-here { background: var(--bg-2); color: var(--absent); }
 .glyph-btn.not-here .glyph-name { color: var(--faint); }
-.endgame-tip { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: rgba(77, 163, 255, 0.08); color: var(--text); }
-.endgame-tip strong { color: var(--accent-2); }
 
 /* Success: the slot row charges with the ring, the banner lands */
 .slot.energized, .slot.revealed.mark-locked.energized {
@@ -321,3 +318,25 @@ button.armed { border-color: var(--danger); color: var(--danger); }
 @media (prefers-reduced-motion: reduce) {
   .slot.energized, .slot.revealed.mark-locked.energized, .banner.success { animation: none; }
 }
+
+/* Glyph families */
+.palette.families { display: flex; flex-direction: column; gap: 6px; }
+.family-row { display: grid; grid-template-columns: 88px repeat(4, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+.family-label { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding-left: 8px; border-left: 3px solid var(--fam); line-height: 1.2; }
+.family-label strong { color: var(--fam); }
+.family-label span { font-size: 0.8rem; color: var(--muted); }
+.rule { margin-top: -4px; }
+.rule strong { color: var(--text); }
+@media (max-width: 520px) {
+  .family-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .family-label { grid-column: 1 / -1; flex-direction: row; gap: 8px; align-items: baseline; }
+}
+
+/* Field guide */
+.guide-slot:empty { display: none; }
+.guide { max-width: 1168px; margin: 16px auto 0; padding: 12px 16px; border: 1px solid var(--accent); border-radius: 12px; background: var(--panel); box-sizing: border-box; width: calc(100% - 32px); }
+.guide-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.guide-head strong { color: var(--accent-2); letter-spacing: 0.04em; }
+.guide-head button.small { margin-top: 0; }
+.guide ul { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.danger-note { margin: -4px 0 8px; color: var(--danger); font-size: 0.9rem; }

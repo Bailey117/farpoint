@@ -17,7 +17,7 @@ import {
   scoreGuess,
   validateGuess,
 } from './address';
-import { GLYPH_IDS, type GlyphId } from './glyphs';
+import { FAMILIES, GLYPH_IDS, type GlyphId, familyOf } from './glyphs';
 import { Rng, type Seed, deriveSeed } from './rng';
 
 export type AidKind = 'reveal' | 'eliminate' | 'freeDial';
@@ -45,6 +45,11 @@ export interface DecodeState {
   status: DecodeStatus;
   /** RNG state for aid effects, so they replay identically. */
   rngState: number;
+  /**
+   * Whether this address follows the family grammar (one glyph per family).
+   * Absent on addresses made before the grammar existed.
+   */
+  grammar?: boolean;
 }
 
 export interface DecodeConfig {
@@ -53,6 +58,8 @@ export interface DecodeConfig {
   fragments: FragmentSpec;
   power: number;
   aids: AidCharges;
+  /** Follow the family grammar (default true). */
+  grammar?: boolean;
 }
 
 export const DEFAULT_DECODE_CONFIG: DecodeConfig = {
@@ -65,7 +72,8 @@ export const DEFAULT_DECODE_CONFIG: DecodeConfig = {
 
 export function createDecode(seed: Seed, config: DecodeConfig = DEFAULT_DECODE_CONFIG): DecodeState {
   const addressRng = new Rng(deriveSeed(seed, 'address'));
-  const address = generateAddress(addressRng, config.length);
+  const grammar = config.grammar ?? true;
+  const address = generateAddress(addressRng, config.length, grammar);
   const facts = generateFragmentFacts(new Rng(deriveSeed(seed, 'fragments')), address, config.fragments);
   return withStatus({
     address,
@@ -77,6 +85,7 @@ export function createDecode(seed: Seed, config: DecodeConfig = DEFAULT_DECODE_C
     aids: { ...config.aids },
     status: 'active',
     rngState: new Rng(deriveSeed(seed, 'aids')).getState(),
+    grammar,
   });
 }
 
@@ -243,18 +252,37 @@ export function solvedAddress(state: DecodeState): Address | null {
  * those glyphs. A solved slot has exactly its glyph. The true glyph is
  * always included.
  */
-export function slotCandidates(k: Knowledge, slot: number): GlyphId[] {
+export function slotCandidates(k: Knowledge, slot: number, grammar = false): GlyphId[] {
   const known = k.slotGlyph[slot];
   if (known) return [known];
   const length = k.slotGlyph.length;
   const placed = new Set(k.slotGlyph.filter((g): g is GlyphId => g !== null));
   const identified = GLYPH_IDS.filter((g) => k.glyphStatus[g] === 'present' || k.glyphStatus[g] === 'locked');
   const allIdentified = identified.length >= length;
+  const familyOpen = grammar ? familyCapacity(k, length) : () => true;
   return GLYPH_IDS.filter(
     (g) =>
       k.glyphStatus[g] !== 'absent' &&
       !placed.has(g) &&
       !k.slotExcluded[slot]!.has(g) &&
-      (!allIdentified || k.glyphStatus[g] === 'present'),
+      (!allIdentified || k.glyphStatus[g] === 'present') &&
+      (k.glyphStatus[g] === 'present' || familyOpen(g)),
   );
+}
+
+/**
+ * Family rule: could an as-yet-unidentified glyph still be in the address?
+ * Every family has at least one glyph in it; only `length - 6` families (one,
+ * for the final address) may have two. A family that already has its share
+ * of identified glyphs is closed to the rest of its members.
+ */
+function familyCapacity(k: Knowledge, length: number): (g: GlyphId) => boolean {
+  const count = new Map<string, number>();
+  for (const g of GLYPH_IDS) {
+    if (k.glyphStatus[g] === 'present' || k.glyphStatus[g] === 'locked') count.set(familyOf(g), (count.get(familyOf(g)) ?? 0) + 1);
+  }
+  const extras = Math.max(0, length - FAMILIES.length);
+  const extrasUsed = [...count.values()].reduce((a, c) => a + Math.max(0, c - 1), 0);
+  const extraLeft = extras - extrasUsed;
+  return (g) => (count.get(familyOf(g)) ?? 0) === 0 || extraLeft > 0;
 }

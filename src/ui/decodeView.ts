@@ -17,7 +17,8 @@ import {
   slotCandidates,
   useAid,
 } from '../game/decode';
-import { GLYPH_IDS, type GlyphId, glyphName } from '../game/glyphs';
+import { FAMILIES, GLYPH_IDS, type GlyphId, glyphName } from '../game/glyphs';
+import { FAMILY_COLOR } from './families';
 import { h } from './dom';
 import { glyphSvg } from './glyphArt';
 import { revealedMarks } from './ringTimeline';
@@ -258,12 +259,10 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
     );
 
     // Candidate helper: which glyphs could still go in the highlighted slot.
+    const grammar = state.grammar === true;
     const slotN = cursor + 1;
-    const candidates = new Set(slotCandidates(k, cursor));
+    const candidates = new Set(slotCandidates(k, cursor, grammar));
     const solvedHere = k.slotGlyph[cursor];
-    const openSlots = k.slotGlyph.map((g, i) => (g === null ? i : -1)).filter((i) => i >= 0);
-    const lastSlot = openSlots.length === 1 ? openSlots[0]! : null;
-    const lastCandidates = lastSlot === null ? [] : slotCandidates(k, lastSlot);
     const candidateNames = [...candidates].map(glyphName);
     const helper =
       shown.status === 'solved' || result
@@ -278,33 +277,37 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
                   candidates.size <= 8 ? ` (${candidateNames.join(', ')}).` : '. The others are dimmed.',
                 ],
           );
-    const endgame =
-      lastSlot !== null && lastCandidates.length > 1 && shown.status !== 'solved' && !result
-        ? h(
-            'div',
-            { class: 'endgame-tip' },
-            h('strong', {}, `Only slot ${lastSlot + 1} is left, with ${lastCandidates.length} candidates.`),
-            ' Put some of them in your solved slots as well: one dial then tests several at once, and you lose nothing because you already know what goes there.',
-          )
-        : null;
 
-    const palette = h(
-      'div',
-      { class: 'palette', role: 'group', 'aria-label': 'Glyphs' },
-      GLYPH_IDS.map((g) =>
-        h(
-          'button',
-          {
-            class: `glyph-btn status-${k.glyphStatus[g]} ${draft.includes(g) ? 'in-draft' : ''} ${!candidates.has(g) && k.glyphStatus[g] !== 'absent' ? 'not-here' : ''}`,
-            title: `${glyphName(g)} — ${statusText(k.glyphStatus[g])}${!candidates.has(g) && k.glyphStatus[g] !== 'absent' ? `; cannot go in slot ${slotN}` : ''}`,
-            disabled: dialing,
-            onclick: () => placeGlyph(g),
-          },
-          glyphSvg(g),
-          h('span', { class: 'glyph-name' }, glyphName(g)),
-        ),
-      ),
-    );
+    const glyphButton = (g: GlyphId) => {
+      const notHere = !candidates.has(g) && k.glyphStatus[g] !== 'absent';
+      return h(
+        'button',
+        {
+          class: `glyph-btn status-${k.glyphStatus[g]} ${draft.includes(g) ? 'in-draft' : ''} ${notHere ? 'not-here' : ''}`,
+          title: `${glyphName(g)} — ${statusText(k.glyphStatus[g])}${notHere ? `; cannot go in slot ${slotN}` : ''}`,
+          disabled: dialing,
+          onclick: () => placeGlyph(g),
+        },
+        glyphSvg(g),
+        h('span', { class: 'glyph-name' }, glyphName(g)),
+      );
+    };
+    // With the grammar, glyphs are grouped by family; a family is marked once one of its glyphs is found.
+    const palette = grammar
+      ? h(
+          'div',
+          { class: 'palette families', role: 'group', 'aria-label': 'Glyphs by family' },
+          FAMILIES.map((f) => {
+            const found = f.glyphs.filter((g) => k.glyphStatus[g] === 'present' || k.glyphStatus[g] === 'locked');
+            return h(
+              'div',
+              { class: 'family-row', style: `--fam: ${FAMILY_COLOR[f.id]}` },
+              h('div', { class: 'family-label' }, h('strong', {}, f.name), found.length ? h('span', {}, `found: ${found.map(glyphName).join(', ')}`) : null),
+              f.glyphs.map((g) => glyphButton(g)),
+            );
+          }),
+        )
+      : h('div', { class: 'palette', role: 'group', 'aria-label': 'Glyphs' }, GLYPH_IDS.map(glyphButton));
 
     const aids = h(
       'div',
@@ -411,8 +414,16 @@ export function mountDecodeView(root: HTMLElement, initial: DecodeState, opts: D
             { class: 'panel' },
             h('h2', {}, 'Glyphs'),
             h('p', { class: 'muted' }, 'Pick glyphs to fill the highlighted slot. Click a slot to clear it.'),
-            h('p', { class: 'muted tip' }, 'Tip: a slot you have already solved can hold an untested glyph instead. You learn more from each dial.'),
-            endgame,
+            state.grammar
+              ? h(
+                  'p',
+                  { class: 'muted rule' },
+                  h('strong', {}, 'Address rule: '),
+                  state.address.length > FAMILIES.length
+                    ? 'one glyph from each of the six families, in any order, plus one more: one family appears twice.'
+                    : 'one glyph from each of the six families, in any order.',
+                )
+              : null,
             helper,
             palette,
             h('h2', {}, 'Puzzle aids'),

@@ -30,6 +30,7 @@ import { isSoundOn, setSoundOn } from './dialPlayer';
 import { mountDialView } from './dialView';
 import { h } from './dom';
 import { mountExpeditionView } from './expeditionView';
+import { type GuideKey, guideCard, hasSeenGuide, markGuideSeen } from './guide';
 import { confirmButton, powerMeter } from './widgets';
 
 type Screen =
@@ -56,8 +57,11 @@ function browserStorage(): KeyValueStorage {
 export function startApp(root: HTMLElement): void {
   const storage = browserStorage();
   const topbar = h('header', { class: 'topbar' });
+  const guideEl = h('div', { class: 'guide-slot' });
   const screenEl = h('div', { class: 'screen' });
-  root.replaceChildren(topbar, screenEl);
+  root.replaceChildren(topbar, guideEl, screenEl);
+  /** Guide forced open from the top bar for the current screen. */
+  let guideOpen = false;
 
   let run: RunState | null = null;
   let screen: Screen = { kind: 'title' };
@@ -97,11 +101,33 @@ export function startApp(root: HTMLElement): void {
     show(run && run.status !== 'active' ? { kind: 'end' } : screen.kind === 'base' ? { kind: 'base' } : screen);
   }
 
+  function guideKeyFor(s: Screen): GuideKey | null {
+    return s.kind === 'base' ? 'base' : s.kind === 'decode' ? 'decode' : s.kind === 'excursion' ? 'expedition' : null;
+  }
+
+  /** Show the screen's guide card on first visit, or when opened from the top bar. */
+  function renderGuide() {
+    const key = guideKeyFor(screen);
+    if (!key || !run || (!guideOpen && hasSeenGuide(key))) {
+      guideEl.replaceChildren();
+      return;
+    }
+    guideEl.replaceChildren(
+      guideCard(key, () => {
+        markGuideSeen(key);
+        guideOpen = false;
+        renderGuide();
+      }),
+    );
+  }
+
   function show(next: Screen) {
     mounted?.dispose();
     mounted = null;
+    if (next.kind !== screen.kind) guideOpen = false;
     screen = next;
     renderTopbar();
+    renderGuide();
     window.scrollTo?.(0, 0);
     switch (next.kind) {
       case 'title':
@@ -221,6 +247,9 @@ export function startApp(root: HTMLElement): void {
           )
         : null,
       saveFailed ? h('span', { class: 'warn-text' }, 'Saving failed: progress will be lost on reload') : null,
+      r && guideKeyFor(screen)
+        ? h('button', { class: 'sound-toggle', 'aria-pressed': guideOpen ? 'true' : 'false', onclick: () => { guideOpen = !guideOpen; renderTopbar(); renderGuide(); } }, 'Guide')
+        : null,
       h(
         'button',
         { class: 'sound-toggle', 'aria-pressed': isSoundOn() ? 'true' : 'false', title: 'Toggle sound', onclick: () => { setSoundOn(!isSoundOn()); renderTopbar(); } },

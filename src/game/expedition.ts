@@ -24,6 +24,11 @@ export interface ExpeditionConfig {
   emergencyCost: number;
   /** Bonus chance when the actor has the check's favoured role. */
   roleBonus: number;
+  /**
+   * On worlds at or above `hazard`, wounds from failed checks are this many
+   * steps worse. Dangerous worlds should be dangerous.
+   */
+  harshFailure: { hazard: number; extra: number };
 }
 
 export const DEFAULT_EXPEDITION_CONFIG: ExpeditionConfig = {
@@ -31,6 +36,7 @@ export const DEFAULT_EXPEDITION_CONFIG: ExpeditionConfig = {
   returnCost: 0,
   emergencyCost: 15,
   roleBonus: 0.15,
+  harshFailure: { hazard: 3, extra: 1 },
 };
 
 export type ExpeditionStatus =
@@ -170,6 +176,8 @@ export function applyOutcome(
   outcome: Outcome,
   actorId: string | null,
   rng: Rng,
+  /** Extra wound steps on every wound effect (harsh failures on dangerous worlds). */
+  extraWounds = 0,
 ): { state: ExpeditionState; applied: AppliedEffect[]; targetName?: string } {
   const team = state.team.slice();
   let power = state.power;
@@ -216,7 +224,7 @@ export function applyOutcome(
             applied.push({ kind: 'spared', memberId: m.id });
             continue;
           }
-          const next = changeWounds(m, fx.amount);
+          const next = changeWounds(m, fx.amount + extraWounds);
           team[i] = next;
           applied.push({ kind: 'wound', memberId: m.id, from: m.wounds, to: next.wounds, died: !isAlive(next) });
         }
@@ -275,7 +283,8 @@ export function choose(
   }
   const outcome = success ? choice.success : (choice.failure as Outcome);
   const paid: ExpeditionState = { ...state, power: state.power - cost };
-  const { state: after, applied, targetName } = applyOutcome(paid, outcome, actor?.id ?? null, rng);
+  const harsh = !success && state.world.hazard >= state.config.harshFailure.hazard ? state.config.harshFailure.extra : 0;
+  const { state: after, applied, targetName } = applyOutcome(paid, outcome, actor?.id ?? null, rng, harsh);
   const resolution: Resolution = {
     encounterId: enc.id,
     choiceId,

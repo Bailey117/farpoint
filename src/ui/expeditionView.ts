@@ -195,6 +195,9 @@ export function mountExpeditionView(root: HTMLElement, opts: ExpeditionViewOptio
       { class: 'panel encounter' },
       h('h2', {}, `Encounter ${s.step + 1} of ${s.world.encounters.length}`),
       h('h3', { class: 'enc-title' }, enc.title),
+      s.world.hazard >= s.config.harshFailure.hazard
+        ? h('p', { class: 'danger-note' }, `Dangerous world (hazard ${s.world.hazard}): failed checks wound one step more.`)
+        : null,
       h('p', { class: 'enc-text' }, enc.text),
       h(
         'div',

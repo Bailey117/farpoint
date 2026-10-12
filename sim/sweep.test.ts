@@ -4,7 +4,7 @@ import { ENCOUNTERS } from '../src/data/encounters';
 import { RUN_CONFIG } from '../src/game/run';
 import { playRun, summarise } from './bots';
 
-type Patch = Partial<{ payMult: number; dialCost: number; startPower: number; returnTrickle: number; genPower: number; healCost: number; recruitChance: number; finalChance: number; finalUnlock: number; returnCost: number; emergencyCost: number }>;
+type Patch = Partial<{ payMult: number; restHeal: number; harshHazard: number; harshExtra: number; dialCost: number; startPower: number; returnTrickle: number; genPower: number; healCost: number; recruitChance: number; finalChance: number; finalUnlock: number; returnCost: number; emergencyCost: number }>;
 
 function apply(p: Patch) {
   const saved = JSON.parse(JSON.stringify(RUN_CONFIG));
@@ -13,6 +13,10 @@ function apply(p: Patch) {
   if (p.returnTrickle !== undefined) RUN_CONFIG.returnTrickle = p.returnTrickle;
   if (p.genPower !== undefined) RUN_CONFIG.generator = { ...RUN_CONFIG.generator, power: p.genPower };
   if (p.healCost !== undefined) RUN_CONFIG.healCost = p.healCost;
+  if (p.restHeal !== undefined) RUN_CONFIG.restHeal = p.restHeal;
+  if (p.harshHazard !== undefined || p.harshExtra !== undefined) {
+    RUN_CONFIG.expedition = { ...RUN_CONFIG.expedition, harshFailure: { hazard: p.harshHazard ?? RUN_CONFIG.expedition.harshFailure.hazard, extra: p.harshExtra ?? RUN_CONFIG.expedition.harshFailure.extra } };
+  }
   if (p.recruitChance !== undefined) RUN_CONFIG.recruitChance = p.recruitChance;
   if (p.finalChance !== undefined) RUN_CONFIG.finalFragment = { ...RUN_CONFIG.finalFragment, chance: p.finalChance };
   if (p.finalUnlock !== undefined) RUN_CONFIG.finalUnlockFacts = p.finalUnlock;

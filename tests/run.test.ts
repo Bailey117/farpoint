@@ -74,6 +74,14 @@ describe('newRun', () => {
     for (const l of run.leads) for (const f of l.facts) expect(factHolds(l.address, f)).toBe(true);
   });
 
+  it('new leads follow the family grammar; leads saved before it do not use the family rule', () => {
+    const run = newRun('gram-run');
+    for (const l of run.leads) expect(l.grammar).toBe(true);
+    expect(decodeStateFor(run, run.leads[0]!.id)!.grammar).toBe(true);
+    const legacy = { ...run, leads: run.leads.map(({ grammar: _g, ...l }) => l) };
+    expect(decodeStateFor(legacy, run.leads[0]!.id)!.grammar).toBe(false);
+  });
+
   it('is reproducible from its seed', () => {
     expect(newRun('same')).toEqual(newRun('same'));
     expect(newRun('a').leads[0]!.address).not.toEqual(newRun('b').leads[0]!.address);

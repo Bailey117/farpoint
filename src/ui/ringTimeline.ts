@@ -8,9 +8,12 @@
  */
 
 import type { Mark } from '../game/address';
-import { GLYPH_IDS, type GlyphId } from '../game/glyphs';
+import { FAMILIES, GLYPH_IDS, type GlyphId } from '../game/glyphs';
 
 export const GLYPH_STEP_DEG = 360 / GLYPH_IDS.length;
+
+/** Order of the glyphs around the ring: grouped by family, so each family is one arc. */
+export const RING_ORDER: readonly GlyphId[] = FAMILIES.flatMap((f) => f.glyphs);
 
 export interface DialTiming {
   /** Rim lights up and the hum builds before the first turn. */
@@ -78,7 +81,7 @@ export interface DialPlan {
 
 /** Ring angle (degrees) that brings `glyph` under the keystone at the top. */
 export function angleForGlyph(glyph: GlyphId): number {
-  return -GLYPH_IDS.indexOf(glyph) * GLYPH_STEP_DEG;
+  return -RING_ORDER.indexOf(glyph) * GLYPH_STEP_DEG;
 }
 
 /** Signed shortest rotation from `from` to `to` (mod 360), in (-180, 180]. */

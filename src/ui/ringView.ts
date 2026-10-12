@@ -5,9 +5,10 @@
  */
 
 import type { Mark } from '../game/address';
-import { GLYPH_IDS, type GlyphId } from '../game/glyphs';
+import { type GlyphId, familyOf } from '../game/glyphs';
+import { FAMILY_COLOR } from './families';
 import { glyphMarkup } from './glyphArt';
-import { type ChevronLight, GLYPH_STEP_DEG, type RingFrame } from './ringTimeline';
+import { type ChevronLight, GLYPH_STEP_DEG, RING_ORDER, type RingFrame } from './ringTimeline';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -138,10 +139,16 @@ export class RingView {
       stroke: '#120f0b',
       'stroke-width': 2,
     }, this.rotor);
+    // Each family is one tinted arc of the band, its glyphs in the family colour.
+    const half = Math.PI / 24; // half of one 15-degree glyph segment
+    const wedge = `M${-149 * Math.sin(half)} ${-149 * Math.cos(half)} A149 149 0 0 1 ${149 * Math.sin(half)} ${-149 * Math.cos(half)} L${108 * Math.sin(half)} ${-108 * Math.cos(half)} A108 108 0 0 0 ${-108 * Math.sin(half)} ${-108 * Math.cos(half)} Z`;
+    const tints = el('g', {}, this.rotor);
     const seps = el('g', { stroke: '#17130e', 'stroke-width': 2 }, this.rotor);
-    GLYPH_IDS.forEach((id, k) => {
+    RING_ORDER.forEach((id, k) => {
+      const color = FAMILY_COLOR[familyOf(id)];
+      el('path', { d: wedge, fill: color, 'fill-opacity': 0.13, transform: `rotate(${k * GLYPH_STEP_DEG})` }, tints);
       el('line', { x1: 0, y1: -110, x2: 0, y2: -147, transform: `rotate(${k * GLYPH_STEP_DEG + GLYPH_STEP_DEG / 2})` }, seps);
-      const holder = el('g', { transform: `rotate(${k * GLYPH_STEP_DEG}) translate(0 -128)`, color: '#d8c49c', class: 'ring-glyph' }, this.rotor);
+      const holder = el('g', { transform: `rotate(${k * GLYPH_STEP_DEG}) translate(0 -128)`, color, class: 'ring-glyph' }, this.rotor);
       glyphGroup(id, 28, holder);
     });
 
